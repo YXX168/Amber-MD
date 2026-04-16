@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1A0E00"/>
+      <stop offset="100%" stop-color="#0D0700"/>
+    </linearGradient>
+    <linearGradient id="amber" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFB300"/>
+      <stop offset="40%" stop-color="#FF8F00"/>
+      <stop offset="100%" stop-color="#E65100"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFD54F" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#FF8F00" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="blur">
+      <feGaussianBlur stdDeviation="8"/>
+    </filter>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#E65100" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="512" height="512" rx="80" fill="url(#bg)"/>
+  
+  <!-- Outer glow -->
+  <ellipse cx="256" cy="256" rx="180" ry="180" fill="url(#glow)" filter="url(#blur)" opacity="0.4"/>
+  
+  <!-- Crystal / amber shape - hexagonal gem -->
+  <g filter="url(#shadow)" transform="translate(256,256)">
+    <!-- Main crystal body -->
+    <polygon points="0,-120 104,-60 104,60 0,120 -104,60 -104,-60" 
+             fill="url(#amber)" opacity="0.9"/>
+    <!-- Top facet highlight -->
+    <polygon points="0,-120 104,-60 0,-30 -104,-60" 
+             fill="#FFD54F" opacity="0.4"/>
+    <!-- Left facet -->
+    <polygon points="-104,-60 0,-30 0,120 -104,60" 
+             fill="#E65100" opacity="0.3"/>
+    <!-- Right facet -->
+    <polygon points="104,-60 0,-30 0,120 104,60" 
+             fill="#FFB300" opacity="0.2"/>
+    <!-- Inner glow line -->
+    <line x1="-60" y1="-20" x2="60" y2="-20" stroke="#FFECB3" stroke-width="2" opacity="0.6"/>
+    <line x1="-40" y1="10" x2="40" y2="10" stroke="#FFECB3" stroke-width="1.5" opacity="0.4"/>
+    <!-- Sparkle dots -->
+    <circle cx="-30" cy="-50" r="3" fill="white" opacity="0.8"/>
+    <circle cx="40" cy="-30" r="2" fill="white" opacity="0.6"/>
+    <circle cx="-50" cy="20" r="2.5" fill="white" opacity="0.5"/>
+  </g>
+  
+  <!-- "A" letter overlay -->
+  <text x="256" y="280" text-anchor="middle" font-family="Georgia, serif" 
+        font-size="100" font-weight="bold" fill="white" opacity="0.15">A</text>
+</svg>
