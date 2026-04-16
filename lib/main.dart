@@ -481,10 +481,12 @@ class GlassMdApp extends StatelessWidget {
               return null;
             },
           ),
-        },
-      ),
+        ),
+      },
     ),
-  );
+  },
+),
+),
   }
 }
 
