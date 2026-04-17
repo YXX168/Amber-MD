@@ -76,31 +76,13 @@ class WebDavService {
     final bodyBytes = utf8.encode(propfindXml);
 
     try {
-      final request = http.Request('PROPFIND', uri);
-      request.headers.addAll({
-        'Authorization': _authHeader,
-        'Depth': '1',
-        'Content-Type': 'application/xml; charset=utf-8',
-        'Content-Length': bodyBytes.length.toString(),
-        'User-Agent': 'Amber-MD/6.0',
-      });
-      request.bodyBytes = bodyBytes;
-
       final client = _client;
       try {
-        final streamedResp = await client.send(request).timeout(
-              const Duration(seconds: 15),
-              onTimeout: () {
-                throw TimeoutException('PROPFIND 请求超时');
-              },
-            );
-
-        final resp = await http.Response.fromStream(streamedResp).timeout(
-              const Duration(seconds: 15),
-              onTimeout: () {
-                throw TimeoutException('读取响应超时');
-              },
-            );
+        final resp = await _propfindWithRedirect(
+          client: client,
+          uri: uri,
+          bodyBytes: bodyBytes,
+        );
 
         // 认证失败
         if (resp.statusCode == 401 || resp.statusCode == 403) {
@@ -155,6 +137,80 @@ class WebDavService {
     } on http.ClientException catch (e) {
       throw Exception('连接失败: ${e.message}');
     }
+  }
+
+  /// 发送 PROPFIND 请求并自动跟随重定向（301/302/307/308）
+  ///
+  /// http 包对 PROPFIND 等非标准方法不会自动跟随重定向，
+  /// 需要手动处理 3xx 响应。
+  static const _maxRedirects = 5;
+
+  Future<http.Response> _propfindWithRedirect({
+    required http.Client client,
+    required Uri uri,
+    required List<int> bodyBytes,
+    int redirectCount = 0,
+  }) async {
+    final request = http.Request('PROPFIND', uri);
+    request.headers.addAll({
+      'Authorization': _authHeader,
+      'Depth': '1',
+      'Content-Type': 'application/xml; charset=utf-8',
+      'Content-Length': bodyBytes.length.toString(),
+      'User-Agent': 'Amber-MD/6.0',
+    });
+    request.bodyBytes = bodyBytes;
+
+    final streamedResp = await client.send(request).timeout(
+          const Duration(seconds: 15),
+          onTimeout: () {
+            throw TimeoutException('PROPFIND 请求超时');
+          },
+        );
+
+    final resp = await http.Response.fromStream(streamedResp).timeout(
+          const Duration(seconds: 15),
+          onTimeout: () {
+            throw TimeoutException('读取响应超时');
+          },
+        );
+
+    // 处理重定向
+    if (resp.statusCode >= 300 &&
+        resp.statusCode < 400 &&
+        resp.statusCode != 304) {
+      if (redirectCount >= _maxRedirects) {
+        throw Exception('服务器重定向次数过多（超过 $_maxRedirects 次）');
+      }
+
+      final location = resp.headers['location'];
+      if (location == null || location.isEmpty) {
+        throw Exception('服务器返回重定向 (HTTP ${resp.statusCode}) 但未提供目标地址');
+      }
+
+      // 解析重定向目标
+      Uri redirectUri;
+      if (location.startsWith('http://') || location.startsWith('https://')) {
+        redirectUri = Uri.parse(location);
+      } else if (location.startsWith('/')) {
+        redirectUri = uri.replace(path: location);
+      } else {
+        // 相对路径
+        final basePath = uri.path.substring(
+            0, uri.path.lastIndexOf('/') + 1);
+        redirectUri = uri.replace(path: basePath + location);
+      }
+
+      debugPrint('[WebDAV] 重定向 ${resp.statusCode}: $uri -> $redirectUri');
+      return _propfindWithRedirect(
+        client: client,
+        uri: redirectUri,
+        bodyBytes: bodyBytes,
+        redirectCount: redirectCount + 1,
+      );
+    }
+
+    return resp;
   }
 
   /// 解析 PROPFIND XML 响应
