@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -133,7 +134,7 @@ class WebDavService {
     for (final match in matches) {
       final resp = match.group(1)!;
 
-      final isDir =
+      var isDir =
           RegExp(r'<[a-zA-Z0-9:]+collection\s*/\s*>', dotAll: true)
                   .hasMatch(resp) ||
               RegExp(
