@@ -90,7 +90,7 @@ class WebDavService {
       final bodyBytes = body != null ? utf8.encode(body) : null;
       final sb = StringBuffer();
       sb.writeln('$method $path HTTP/1.1');
-      sb.writeln('Host: $host${portStr(host, port, isSecure, uri)}');
+      sb.writeln('Host: $host$portStr(host, port, isSecure, uri)');
       for (final entry in headers.entries) {
         sb.writeln('${entry.key}: ${entry.value}');
       }
@@ -127,7 +127,7 @@ class WebDavService {
       if (parsed.statusCode >= 300 &&
           parsed.statusCode < 400 &&
           parsed.statusCode != 304) {
-        if (redirectCount >= maxRedirects) {
+        if (_redirectCount >= maxRedirects) {
           throw Exception('服务器重定向次数过多（超过 $maxRedirects 次）');
         }
 
@@ -155,7 +155,7 @@ class WebDavService {
           headers: headers,
           body: body,
           maxRedirects: maxRedirects,
-          redirectCount: redirectCount + 1,
+          _redirectCount: redirectCount + 1,
         );
       }
 
@@ -274,7 +274,7 @@ class WebDavService {
           'Authorization': _authHeader,
           'Depth': '1',
           'Content-Type': 'application/xml; charset=utf-8',
-          'User-Agent': 'Amber-MD/6.0.4',
+          'User-Agent': 'Amber-MD/6.0.5',
         },
         body: propfindXml,
       );
@@ -367,7 +367,7 @@ class WebDavService {
           'Host: $host${parsedUri.hasPort && port != 80 && port != 443 ? ':$port' : ''}\r\n'
           'Authorization: $_authHeader\r\n'
           'Accept: */*\r\n'
-          'User-Agent: Amber-MD/6.0.4\r\n'
+          'User-Agent: Amber-MD/6.0.5\r\n'
           'Connection: close\r\n'
           '\r\n';
 

@@ -1,7 +1,7 @@
 name: amber_md
 description: Amber MD - A beautiful glassmorphism Markdown viewer.
 publish_to: 'none'
-version: 6.0.4+604
+version: 6.0.5+605
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
