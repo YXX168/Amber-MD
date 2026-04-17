@@ -127,7 +127,7 @@ class WebDavService {
       if (parsed.statusCode >= 300 &&
           parsed.statusCode < 400 &&
           parsed.statusCode != 304) {
-        if (_redirectCount >= maxRedirects) {
+        if (redirectCount >= maxRedirects) {
           throw Exception('服务器重定向次数过多（超过 $maxRedirects 次）');
         }
 
@@ -155,7 +155,7 @@ class WebDavService {
           headers: headers,
           body: body,
           maxRedirects: maxRedirects,
-          _redirectCount: redirectCount + 1,
+          redirectCount: redirectCount + 1,
         );
       }
 
