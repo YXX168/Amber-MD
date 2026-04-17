@@ -1,7 +1,7 @@
 name: amber_md
 description: Amber MD - A beautiful glassmorphism Markdown viewer.
 publish_to: 'none'
-version: 6.0.2+602
+version: 6.0.4+604
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
@@ -19,7 +19,6 @@ dependencies:
   path: ^1.9.0
   receive_intent: ^0.2.7
   url_launcher: ^6.2.0
-  http: ^1.2.0
 
 dev_dependencies:
   flutter_test:

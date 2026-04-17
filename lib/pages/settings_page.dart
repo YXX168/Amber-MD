@@ -82,31 +82,31 @@ class SettingsPage extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             // 主题风格选择
-                            const SectionTitle(title: '主题风格'),
+                            const SectionTitle('主题风格'),
                             const SizedBox(height: 12),
                             _buildThemeSelector(tp, theme, isDark),
                             const SizedBox(height: 28),
 
                             // 字体大小选择
-                            const SectionTitle(title: '字体大小'),
+                            const SectionTitle('字体大小'),
                             const SizedBox(height: 12),
                             _buildFontSizeSelector(tp, theme, isDark),
                             const SizedBox(height: 28),
 
                             // 字间距选择
-                            const SectionTitle(title: '字间距'),
+                            const SectionTitle('字间距'),
                             const SizedBox(height: 12),
                             _buildLetterSpacingSelector(tp, theme, isDark),
                             const SizedBox(height: 28),
 
                             // 行高选择
-                            const SectionTitle(title: '行高'),
+                            const SectionTitle('行高'),
                             const SizedBox(height: 12),
                             _buildLineHeightSelector(tp, theme, isDark),
                             const SizedBox(height: 28),
 
                             // 预览
-                            const SectionTitle(title: '预览'),
+                            const SectionTitle('预览'),
                             const SizedBox(height: 12),
                             _buildPreview(tp, theme),
                           ],
