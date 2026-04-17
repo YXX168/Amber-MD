@@ -152,19 +152,20 @@ class _ReaderPageState extends State<ReaderPage> with TickerProviderStateMixin {
       }
 
       if (mounted) {
+        // 先启动淡入动画，同时设置内容
+        _fadeController.forward(from: 0);
         setState(() {
           _content = content;
           _loading = false;
         });
-        _fadeController.forward(from: 0);
       }
     } catch (e) {
       if (mounted) {
+        _fadeController.forward(from: 0);
         setState(() {
           _content = '# 读取失败\n\n无法读取文件:\n```\n$e\n```';
           _loading = false;
         });
-        _fadeController.forward(from: 0);
       }
     }
   }
@@ -285,27 +286,64 @@ class _ReaderPageState extends State<ReaderPage> with TickerProviderStateMixin {
 
   /// 简洁加载指示器 — 无持续动画，避免与 FadeTransition 叠加掉帧
   Widget _buildLoadingIndicator(AppTheme theme) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            width: 32,
-            height: 32,
-            child: CircularProgressIndicator(
-              color: theme.primaryColor.withValues(alpha: 0.5),
-              strokeWidth: 2.5,
+    // 加载骨架屏：模拟文档结构，视觉过渡更平滑
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 80, 20, 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 标题骨架
+            Container(
+              height: 28,
+              width: double.infinity * 0.6,
+              decoration: BoxDecoration(
+                color: theme.primaryColor.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            '正在加载...',
-            style: GoogleFonts.inter(
-              fontSize: 13,
-              color: theme.textSecondary.withValues(alpha: 0.4),
+            const SizedBox(height: 20),
+            // 正文骨架行
+            ...List.generate(8, (i) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Container(
+                height: 16,
+                width: double.infinity * (0.4 + (i % 3) * 0.2),
+                decoration: BoxDecoration(
+                  color: theme.textSecondary.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            )),
+            const Spacer(),
+            // 底部加载提示
+            Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      color: theme.primaryColor.withValues(alpha: 0.5),
+                      strokeWidth: 2,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    '正在加载...',
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      color: theme.textSecondary.withValues(alpha: 0.4),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 40),
+          ],
+        ),
       ),
     );
   }

@@ -692,7 +692,10 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
                   // 返回上级按钮
                   if (_pathHistory.isNotEmpty)
                     ScaleOnTap(
-                      onTap: _goBack,
+                      onTap: () {
+                        HapticFeedback.mediumImpact();  // 返回按钮震动反馈
+                        _goBack();
+                      },
                       child: Padding(
                         padding: const EdgeInsets.all(6),
                         child: Icon(Icons.arrow_back_rounded,
@@ -756,14 +759,18 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
                   ),
                 )
               : AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 300),
-                  switchInCurve: Curves.easeOut,
-                  switchOutCurve: Curves.easeIn,
+                  duration: const Duration(milliseconds: 250),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
                   transitionBuilder: (child, animation) {
                     return FadeTransition(
                       opacity: animation,
                       child: child,
                     );
+                  },
+                  layoutBuilder: (currentChild, previousChildren) {
+                    // 只显示当前child，避免幻影
+                    return currentChild ?? const SizedBox();
                   },
                   child: ListView.builder(
                     key: ValueKey('file_list_$_listKey'),
@@ -875,7 +882,12 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
     AppTheme theme,
   ) {
     return ScaleOnTap(
-      onTap: isActive ? null : onTap,
+      onTap: isActive
+          ? null
+          : () {
+              HapticFeedback.lightImpact();  // 点击震动反馈
+              onTap?.call();
+            },
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
         child: Row(
@@ -885,6 +897,7 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
               Container(
                 height: 6,
                 width: 6,
+                margin: const EdgeInsets.only(right: 8),  // 圆点右边距，与文字间距
                 decoration: BoxDecoration(
                   color: theme.primaryColor,
                   shape: BoxShape.circle,

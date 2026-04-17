@@ -38,11 +38,11 @@ class _EmptyStateState extends State<EmptyState>
     final tp = ThemeProvider.of(context);
     final theme = tp.currentTheme;
 
-    // 缩放动画：0.96 ~ 1.0，微妙脉动感
-    final scale = 0.98 + _ctrl.value * 0.02;
+    // 缩放动画：0.92 ~ 1.02，更明显的脉动感
+    final scale = 0.92 + _ctrl.value * 0.10;
 
-    // 上下浮动：-5px ~ +5px，使用 sin 曲线让来回更自然
-    final floatOffset = math.sin(_ctrl.value * math.pi) * 5.0;
+    // 上下浮动：-8px ~ +8px，更明显的自然浮动
+    final floatOffset = math.sin(_ctrl.value * math.pi) * 8.0;
 
     return Center(
       child: Column(
