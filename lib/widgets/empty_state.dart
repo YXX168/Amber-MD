@@ -38,12 +38,6 @@ class _EmptyStateState extends State<EmptyState>
     final tp = ThemeProvider.of(context);
     final theme = tp.currentTheme;
 
-    // 缩放动画：0.92 ~ 1.02，更明显的脉动感
-    final scale = 0.92 + _ctrl.value * 0.10;
-
-    // 上下浮动：-8px ~ +8px，更明显的自然浮动
-    final floatOffset = math.sin(_ctrl.value * math.pi) * 8.0;
-
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -51,9 +45,12 @@ class _EmptyStateState extends State<EmptyState>
           AnimatedBuilder(
             animation: _ctrl,
             builder: (context, child) {
-              // 呼吸光效参数
-              final glowAlpha = 0.12 + _ctrl.value * 0.18;
-              final iconAlpha = 0.45 + _ctrl.value * 0.2;
+              // 所有动画参数都在 builder 内部计算，确保每帧更新
+              final scale = 0.92 + _ctrl.value * 0.10;  // 缩放：0.92 ~ 1.02
+              final floatOffset = math.sin(_ctrl.value * math.pi) * 8.0;  // 上下浮动
+              final glowAlpha = 0.12 + _ctrl.value * 0.18;  // 光晕透明度
+              final iconAlpha = 0.45 + _ctrl.value * 0.2;  // 图标透明度
+              
               return Transform.translate(
                 offset: Offset(0, floatOffset),
                 child: Transform.scale(

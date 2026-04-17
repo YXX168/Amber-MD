@@ -55,6 +55,9 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
 
   // 列表项滑动过渡 key
   int _listKey = 0;
+  
+  // 正在加载文件列表
+  bool _loadingFiles = false;
 
   @override
   void initState() {
@@ -315,6 +318,10 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
   /// 导航到指定路径（内部用，带列表动画）
   Future<void> _navigateToPath(String path) async {
     if (_webdavService == null) return;
+    
+    // 先显示加载状态
+    setState(() => _loadingFiles = true);
+    
     try {
       final list = await _webdavService!.propfind(path);
       if (mounted) {
@@ -322,11 +329,12 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
         _files.addAll(list);
         _listKey++;
         _currentPath = path.endsWith('/') ? path : '$path/';
+        setState(() => _loadingFiles = false);
         _fileListAnimController.forward(from: 0);
-        setState(() {});
       }
     } catch (e) {
       if (mounted) {
+        setState(() => _loadingFiles = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('导航失败: $e')),
         );
@@ -743,92 +751,113 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
           ),
         ),
         const SizedBox(height: 8),
-        // 文件列表（淡入过渡，不使用横向滑动）
+        // 文件列表（骨架占位 + 逐项延迟入场）
         Expanded(
-          child: _files.isEmpty
-              ? FadeTransition(
-                  opacity: _fileListAnim,
-                  child: Center(
-                    child: Text(
-                      '空文件夹',
-                      style: GoogleFonts.inter(
-                        fontSize: 15,
-                        color: theme.textSecondary.withValues(alpha: 0.5),
-                      ),
-                    ),
-                  ),
-                )
-              : AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 250),
-                  switchInCurve: Curves.easeOutCubic,
-                  switchOutCurve: Curves.easeInCubic,
-                  transitionBuilder: (child, animation) {
-                    return FadeTransition(
-                      opacity: animation,
-                      child: child,
-                    );
-                  },
-                  layoutBuilder: (currentChild, previousChildren) {
-                    // 只显示当前child，避免幻影
-                    return currentChild ?? const SizedBox();
-                  },
-                  child: ListView.builder(
-                    key: ValueKey('file_list_$_listKey'),
-                    padding: EdgeInsets.fromLTRB(
-                      20,
-                      0,
-                      20,
-                      MediaQuery.of(context).padding.bottom + 40,
-                    ),
-                    itemCount: _files.length,
-                    itemBuilder: (context, index) {
-                      final file = _files[index];
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: ScaleOnTap(
-                          onTap: file.isDirectory
-                              ? () => _navigateDir(file.name)
-                              : () => _downloadAndOpen(file),
-                          child: GlassCard(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 14),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  file.isDirectory
-                                      ? Icons.folder_rounded
-                                      : Icons.insert_drive_file_rounded,
-                                  color: file.isDirectory
-                                      ? theme.primaryColor
-                                      : theme.accentColor,
-                                  size: 22,
-                                ),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: Text(
-                                    file.name,
-                                    style: GoogleFonts.inter(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
-                                      color: theme.textColor,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                if (file.isDirectory)
-                                  Icon(Icons.chevron_right_rounded,
-                                      color: theme.textSecondary
-                                          .withValues(alpha: 0.3),
-                                      size: 20),
-                              ],
-                            ),
+          child: _loadingFiles
+              ? _buildFilesSkeleton(theme)  // 加载时显示骨架占位
+              : _files.isEmpty
+                  ? FadeTransition(
+                      opacity: _fileListAnim,
+                      child: Center(
+                        child: Text(
+                          '空文件夹',
+                          style: GoogleFonts.inter(
+                            fontSize: 15,
+                            color: theme.textSecondary.withValues(alpha: 0.5),
                           ),
                         ),
-                      );
-                    },
-                  ),
-                ),
+                      ),
+                    )
+                  : AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 250),
+                      switchInCurve: Curves.easeOutCubic,
+                      switchOutCurve: Curves.easeInCubic,
+                      transitionBuilder: (child, animation) {
+                        return FadeTransition(
+                          opacity: animation,
+                          child: child,
+                        );
+                      },
+                      layoutBuilder: (currentChild, previousChildren) {
+                        return currentChild ?? const SizedBox();
+                      },
+                      child: ListView.builder(
+                        key: ValueKey('file_list_$_listKey'),
+                        padding: EdgeInsets.fromLTRB(
+                          20,
+                          0,
+                          20,
+                          MediaQuery.of(context).padding.bottom + 40,
+                        ),
+                        itemCount: _files.length,
+                        itemBuilder: (context, index) {
+                          final file = _files[index];
+                          // 逐项延迟入场动画（每项延迟50ms）
+                          return TweenAnimationBuilder<double>(
+                            tween: Tween(begin: 0.0, end: 1.0),
+                            duration: Duration(milliseconds: 200 + index * 50),
+                            curve: Curves.easeOutCubic,
+                            builder: (context, value, child) {
+                              return FadeTransition(
+                                opacity: AlwaysStoppedAnimation(value.clamp(0.0, 1.0)),
+                                child: SlideTransition(
+                                  position: AlwaysStoppedAnimation(
+                                    Offset(0, 0.05 * (1 - value.clamp(0.0, 1.0))),
+                                  ),
+                                  child: child,
+                                ),
+                              );
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: ScaleOnTap(
+                                onTap: file.isDirectory
+                                    ? () {
+                                        HapticFeedback.lightImpact();
+                                        _navigateDir(file.name);
+                                      }
+                                    : () => _downloadAndOpen(file),
+                                child: GlassCard(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 16, vertical: 14),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        file.isDirectory
+                                            ? Icons.folder_rounded
+                                            : Icons.insert_drive_file_rounded,
+                                        color: file.isDirectory
+                                            ? theme.primaryColor
+                                            : theme.accentColor,
+                                        size: 22,
+                                      ),
+                                      const SizedBox(width: 14),
+                                      Expanded(
+                                        child: Text(
+                                          file.name,
+                                          style: GoogleFonts.inter(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w500,
+                                            color: theme.textColor,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      if (file.isDirectory)
+                                        Icon(Icons.chevron_right_rounded,
+                                            color: theme.textSecondary
+                                                .withValues(alpha: 0.3),
+                                            size: 20),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
         ),
       ],
     );
@@ -916,6 +945,28 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
               overflow: TextOverflow.ellipsis,
             ),
           ],
+        ),
+      ),
+    );
+  }
+  
+  /// 文件列表骨架占位 - 加载时显示，给用户视觉反馈
+  Widget _buildFilesSkeleton(AppTheme theme) {
+    return FadeTransition(
+      opacity: _fileListAnim,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
+        child: Column(
+          children: List.generate(5, (i) => Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Container(
+              height: 48,
+              decoration: BoxDecoration(
+                color: theme.textSecondary.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          )),
         ),
       ),
     );
