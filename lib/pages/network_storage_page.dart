@@ -684,58 +684,57 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: GlassCard(
-                borderRadius: 12,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                child: Row(
-                  children: [
-                    // 返回上级按钮
-                    if (_pathHistory.isNotEmpty)
-                      ScaleOnTap(
-                        onTap: _goBack,
-                        child: Padding(
-                          padding: const EdgeInsets.all(6),
-                          child: Icon(Icons.arrow_back_rounded,
-                              color: theme.primaryColor, size: 18),
-                        ),
-                      ),
-                    if (_pathHistory.isNotEmpty)
-                      const SizedBox(width: 4),
-                    // 面包屑
-                    Expanded(
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            // 根目录
-                            _buildBreadcrumbItem(
-                              '根目录',
-                              _currentPath == '/',
-                              () async {
-                                if (_webdavService == null) return;
-                                await _navigateToPath('/');
-                              },
-                              theme,
-                            ),
-                            // 中间路径段
-                            ..._buildBreadcrumbItems(theme),
-                          ],
-                        ),
-                      ),
-                    ),
-                    // 刷新按钮
+              borderRadius: 12,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+              child: Row(
+                children: [
+                  // 返回上级按钮
+                  if (_pathHistory.isNotEmpty)
                     ScaleOnTap(
-                      onTap: _refresh,
+                      onTap: _goBack,
                       child: Padding(
-                        padding: const EdgeInsets.all(4),
-                        child: Icon(Icons.refresh_rounded,
-                            color: theme.textSecondary
-                                .withValues(alpha: 0.5),
-                            size: 18),
+                        padding: const EdgeInsets.all(6),
+                        child: Icon(Icons.arrow_back_rounded,
+                            color: theme.primaryColor, size: 18),
                       ),
                     ),
-                  ],
-                ),
+                  if (_pathHistory.isNotEmpty)
+                    const SizedBox(width: 4),
+                  // 面包屑
+                  Expanded(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          // 根目录
+                          _buildBreadcrumbItem(
+                            '根目录',
+                            _currentPath == '/',
+                            () async {
+                              if (_webdavService == null) return;
+                              await _navigateToPath('/');
+                            },
+                            theme,
+                          ),
+                          // 中间路径段
+                          ..._buildBreadcrumbItems(theme),
+                        ],
+                      ),
+                    ),
+                  ),
+                  // 刷新按钮
+                  ScaleOnTap(
+                    onTap: _refresh,
+                    child: Padding(
+                      padding: const EdgeInsets.all(4),
+                      child: Icon(Icons.refresh_rounded,
+                          color: theme.textSecondary
+                              .withValues(alpha: 0.5),
+                          size: 18),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
