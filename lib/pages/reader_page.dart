@@ -31,7 +31,7 @@ class ReaderPage extends StatefulWidget {
   State<ReaderPage> createState() => _ReaderPageState();
 }
 
-class _ReaderPageState extends State<ReaderPage> {
+class _ReaderPageState extends State<ReaderPage> with TickerProviderStateMixin {
   String _content = '';
   String _title = '';
   bool _loading = true;
