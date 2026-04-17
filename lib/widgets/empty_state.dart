@@ -1,8 +1,10 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../providers/theme_provider.dart';
 
-/// 空状态动画组件 — 柔和呼吸光效 + 提示文字
+/// 空状态动画组件 — 呼吸光效 + 微妙缩放 + 上下浮动
 class EmptyState extends StatefulWidget {
   final VoidCallback? onPick;
 
@@ -36,6 +38,12 @@ class _EmptyStateState extends State<EmptyState>
     final tp = ThemeProvider.of(context);
     final theme = tp.currentTheme;
 
+    // 缩放动画：0.96 ~ 1.0，微妙脉动感
+    final scale = 0.98 + _ctrl.value * 0.02;
+
+    // 上下浮动：-5px ~ +5px，使用 sin 曲线让来回更自然
+    final floatOffset = math.sin(_ctrl.value * math.pi) * 5.0;
+
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -43,39 +51,45 @@ class _EmptyStateState extends State<EmptyState>
           AnimatedBuilder(
             animation: _ctrl,
             builder: (context, child) {
-              // 柔和呼吸光效：光晕扩散 + 图标透明度微变，不倾斜不缩放
+              // 呼吸光效参数
               final glowAlpha = 0.12 + _ctrl.value * 0.18;
               final iconAlpha = 0.45 + _ctrl.value * 0.2;
-              return Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      theme.primaryColor.withValues(alpha: glowAlpha),
-                      theme.accentColor.withValues(alpha: glowAlpha * 0.5),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(28),
-                  border: Border.all(
-                    color: theme.primaryColor
-                        .withValues(alpha: 0.08 + _ctrl.value * 0.12),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: theme.primaryColor
-                          .withValues(alpha: glowAlpha * 0.6),
-                      blurRadius: 28 + _ctrl.value * 20,
-                      spreadRadius: 2 + _ctrl.value * 6,
+              return Transform.translate(
+                offset: Offset(0, floatOffset),
+                child: Transform.scale(
+                  scale: scale,
+                  child: Container(
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          theme.primaryColor.withValues(alpha: glowAlpha),
+                          theme.accentColor.withValues(alpha: glowAlpha * 0.5),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(28),
+                      border: Border.all(
+                        color: theme.primaryColor
+                            .withValues(alpha: 0.08 + _ctrl.value * 0.12),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: theme.primaryColor
+                              .withValues(alpha: glowAlpha * 0.6),
+                          blurRadius: 28 + _ctrl.value * 20,
+                          spreadRadius: 2 + _ctrl.value * 6,
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                child: Icon(
-                  Icons.description_rounded,
-                  size: 42,
-                  color: theme.textSecondary.withValues(alpha: iconAlpha),
+                    child: Icon(
+                      Icons.description_rounded,
+                      size: 42,
+                      color: theme.textSecondary.withValues(alpha: iconAlpha),
+                    ),
+                  ),
                 ),
               );
             },

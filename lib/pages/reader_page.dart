@@ -18,7 +18,7 @@ import '../widgets/glass_card.dart';
 import '../widgets/glass_fab.dart';
 import '../widgets/glass_icon_button.dart';
 import '../widgets/scale_on_tap.dart';
-import '../widgets/shimmer_sweep.dart';
+// shimmer_sweep removed — causes unnecessary repaint during loading
 
 /// 阅读器页面 — 支持 Markdown 渲染、编辑模式、搜索、自动隐藏 AppBar
 class ReaderPage extends StatefulWidget {
@@ -35,7 +35,6 @@ class _ReaderPageState extends State<ReaderPage> with TickerProviderStateMixin {
   String _content = '';
   String _title = '';
   bool _loading = true;
-  bool _contentReady = false;
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
   final ScrollController _scrollCtrl = ScrollController();
@@ -157,12 +156,7 @@ class _ReaderPageState extends State<ReaderPage> with TickerProviderStateMixin {
           _content = content;
           _loading = false;
         });
-        // 内容就绪后播放淡入动画，避免掉帧
-        await Future.delayed(const Duration(milliseconds: 50));
-        if (mounted) {
-          _fadeController.forward(from: 0);
-          setState(() => _contentReady = true);
-        }
+        _fadeController.forward(from: 0);
       }
     } catch (e) {
       if (mounted) {
@@ -170,11 +164,7 @@ class _ReaderPageState extends State<ReaderPage> with TickerProviderStateMixin {
           _content = '# 读取失败\n\n无法读取文件:\n```\n$e\n```';
           _loading = false;
         });
-        await Future.delayed(const Duration(milliseconds: 50));
-        if (mounted) {
-          _fadeController.forward(from: 0);
-          setState(() => _contentReady = true);
-        }
+        _fadeController.forward(from: 0);
       }
     }
   }
@@ -293,78 +283,23 @@ class _ReaderPageState extends State<ReaderPage> with TickerProviderStateMixin {
     _scrollToMatch(newIdx);
   }
 
-  /// 骨架屏加载动画 — 文件读取时显示，避免内容突然出现导致掉帧
-  Widget _buildLoadingSkeleton(AppTheme theme) {
+  /// 简洁加载指示器 — 无持续动画，避免与 FadeTransition 叠加掉帧
+  Widget _buildLoadingIndicator(AppTheme theme) {
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          ShimmerSweep(
-            child: Container(
-              padding: const EdgeInsets.all(28),
-              decoration: BoxDecoration(
-                color: theme.primaryColor.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                    color: theme.primaryColor.withValues(alpha: 0.15)),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // 模拟标题行
-                  Container(
-                    width: 160,
-                    height: 16,
-                    decoration: BoxDecoration(
-                      color: theme.primaryColor.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  // 模拟正文行
-                  Container(
-                    width: double.infinity,
-                    height: 10,
-                    decoration: BoxDecoration(
-                      color: theme.primaryColor.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(3),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    width: 240,
-                    height: 10,
-                    decoration: BoxDecoration(
-                      color: theme.primaryColor.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(3),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    width: 200,
-                    height: 10,
-                    decoration: BoxDecoration(
-                      color: theme.primaryColor.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(3),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  // 加载指示器
-                  SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(
-                      color: theme.primaryColor.withValues(alpha: 0.6),
-                      strokeWidth: 2.5,
-                    ),
-                  ),
-                ],
-              ),
+          SizedBox(
+            width: 32,
+            height: 32,
+            child: CircularProgressIndicator(
+              color: theme.primaryColor.withValues(alpha: 0.5),
+              strokeWidth: 2.5,
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           Text(
-            '正在加载文档...',
+            '正在加载...',
             style: GoogleFonts.inter(
               fontSize: 13,
               color: theme.textSecondary.withValues(alpha: 0.4),
@@ -477,7 +412,7 @@ class _ReaderPageState extends State<ReaderPage> with TickerProviderStateMixin {
             extendBodyBehindAppBar: true,
             body: AnimatedGradientBg(
               child: _loading
-                  ? _buildLoadingSkeleton(theme)
+                  ? _buildLoadingIndicator(theme)
                   : FadeTransition(
                       opacity: _fadeAnimation,
                       child: Stack(

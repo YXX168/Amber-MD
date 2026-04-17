@@ -198,6 +198,7 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
 
       await _saveWebdavInfo();
       if (mounted) {
+        _navAnimController.forward(from: 0);
         _fileListAnimController.forward(from: 0);
         setState(() {
           _connecting = false;
@@ -244,25 +245,17 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
         ? '$_currentPath$dirName'
         : '$_currentPath/$dirName';
     try {
-      // 播放导航栏淡出动画
-      await _navAnimController.reverse(from: 1);
-
       final list = await _webdavService!.propfind(newPath);
       _pathHistory.add(_currentPath);
-      _files.clear();
-      _files.addAll(list);
-      _listKey++;
-
       if (mounted) {
-        // 播放导航栏淡入 + 列表滑入
-        await _navAnimController.forward(from: 0);
+        _files.clear();
+        _files.addAll(list);
+        _listKey++;
+        _currentPath = newPath.endsWith('/') ? newPath : '$newPath/';
         _fileListAnimController.forward(from: 0);
-        setState(() =>
-            _currentPath = newPath.endsWith('/') ? newPath : '$newPath/');
+        setState(() {});
       }
     } catch (e) {
-      // 确保导航栏恢复
-      if (mounted) await _navAnimController.forward(from: 0);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('无法打开文件夹: $e')),
@@ -319,23 +312,20 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
     await _navigateToPath(_currentPath);
   }
 
-  /// 导航到指定路径（内部用，带动画）
+  /// 导航到指定路径（内部用，带列表动画）
   Future<void> _navigateToPath(String path) async {
     if (_webdavService == null) return;
     try {
-      await _navAnimController.reverse(from: 1);
       final list = await _webdavService!.propfind(path);
-      _files.clear();
-      _files.addAll(list);
-      _listKey++;
       if (mounted) {
-        await _navAnimController.forward(from: 0);
+        _files.clear();
+        _files.addAll(list);
+        _listKey++;
+        _currentPath = path.endsWith('/') ? path : '$path/';
         _fileListAnimController.forward(from: 0);
-        setState(
-            () => _currentPath = path.endsWith('/') ? path : '$path/');
+        setState(() {});
       }
     } catch (e) {
-      if (mounted) await _navAnimController.forward(from: 0);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('导航失败: $e')),
@@ -688,17 +678,12 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
   Widget _buildFileList(AppTheme theme, bool isDark) {
     return Column(
       children: [
-        // 面包屑路径导航栏
+        // 面包屑路径导航栏（简洁淡入淡出，无横向滑动抖动）
         FadeTransition(
           opacity: _navAnim,
-          child: SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(0.3, 0),
-              end: Offset.zero,
-            ).animate(_navAnim),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: GlassCard(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: GlassCard(
                 borderRadius: 12,
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
@@ -756,7 +741,7 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
           ),
         ),
         const SizedBox(height: 8),
-        // 文件列表（带滑动过渡）
+        // 文件列表（淡入过渡，不使用横向滑动）
         Expanded(
           child: _files.isEmpty
               ? FadeTransition(
@@ -772,22 +757,13 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
                   ),
                 )
               : AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 350),
-                  switchInCurve: Curves.easeOutCubic,
+                  duration: const Duration(milliseconds: 300),
+                  switchInCurve: Curves.easeOut,
                   switchOutCurve: Curves.easeIn,
                   transitionBuilder: (child, animation) {
-                    return SlideTransition(
-                      position: Tween<Offset>(
-                        begin: const Offset(0.08, 0),
-                        end: Offset.zero,
-                      ).animate(CurvedAnimation(
-                        parent: animation,
-                        curve: Curves.easeOutCubic,
-                      )),
-                      child: FadeTransition(
-                        opacity: animation,
-                        child: child,
-                      ),
+                    return FadeTransition(
+                      opacity: animation,
+                      child: child,
                     );
                   },
                   child: ListView.builder(
