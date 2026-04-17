@@ -35,13 +35,8 @@ class _ReaderPageState extends State<ReaderPage> with TickerProviderStateMixin {
   String _content = '';
   String _title = '';
   bool _loading = true;
-  bool _preloading = true;  // 预加载状态
-  late AnimationController _preloadController;  // 预加载动画（200ms）
-  late Animation<double> _preloadScaleAnimation;
-  late Animation<double> _preloadFadeAnimation;
-  late AnimationController _fadeController;  // 内容淡入动画（300ms）
+  late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
-  late Animation<double> _contentScaleAnimation;  // 内容轻微弹出效果
   final ScrollController _scrollCtrl = ScrollController();
   bool _showBackToTop = false;
   Timer? _backToTopHideTimer;
@@ -69,38 +64,18 @@ class _ReaderPageState extends State<ReaderPage> with TickerProviderStateMixin {
     super.initState();
     _title = p.basename(widget.filePath);
     _editController = TextEditingController();
-    
-    // 预加载动画（200ms）- 页面打开时先播放
-    _preloadController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 200),
-    );
-    _preloadScaleAnimation = Tween<double>(begin: 0.95, end: 1.0).animate(
-      CurvedAnimation(parent: _preloadController, curve: Curves.easeOutCubic),
-    );
-    _preloadFadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _preloadController, curve: Curves.easeOutCubic),
-    );
-    
-    // 内容淡入动画（300ms）- 内容加载完成后播放
     _fadeController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 350),
     );
     _fadeAnimation = CurvedAnimation(
       parent: _fadeController,
       curve: Curves.easeOutCubic,
     );
-    _contentScaleAnimation = Tween<double>(begin: 1.02, end: 1.0).animate(
-      CurvedAnimation(parent: _fadeController, curve: Curves.easeOutCubic),
-    );
     
-    // 先播放预加载动画，完成后开始加载文件
-    _preloadController.forward().then((_) {
-      if (mounted) {
-        setState(() => _preloading = false);
-        _loadFile();
-      }
+    // 预加载延迟：先让骨架屏淡入，200ms后开始加载文件
+    Future.delayed(const Duration(milliseconds: 200), () {
+      if (mounted) _loadFile();
     });
 
     _scrollCtrl.addListener(_onScroll);
@@ -162,7 +137,6 @@ class _ReaderPageState extends State<ReaderPage> with TickerProviderStateMixin {
     _scrollCtrl.dispose();
     _editController.dispose();
     _searchController.dispose();
-    _preloadController.dispose();
     _fadeController.dispose();
     super.dispose();
   }
@@ -479,18 +453,12 @@ class _ReaderPageState extends State<ReaderPage> with TickerProviderStateMixin {
             extendBody: true,
             extendBodyBehindAppBar: true,
             body: AnimatedGradientBg(
-              child: ScaleTransition(
-                scale: _preloadScaleAnimation,
-                child: FadeTransition(
-                  opacity: _preloadFadeAnimation,
-                  child: _loading
-                      ? _buildLoadingIndicator(theme)
-                      : ScaleTransition(
-                          scale: _contentScaleAnimation,
-                          child: FadeTransition(
-                            opacity: _fadeAnimation,
-                            child: Stack(
-                              children: [
+              child: _loading
+                  ? _buildLoadingIndicator(theme)
+                  : FadeTransition(
+                      opacity: _fadeAnimation,
+                      child: Stack(
+                      children: [
                         // 内容
                         SafeArea(
                           top: false,
@@ -624,14 +592,9 @@ class _ReaderPageState extends State<ReaderPage> with TickerProviderStateMixin {
                       ],
                     ),
                   ),
-                ),  // 内容 FadeTransition 结束
-              ),  // 内容 ScaleTransition 结束
-            ),  // 预加载 FadeTransition 结束
-          ),  // 预加载 ScaleTransition 结束
-        ),  // AnimatedGradientBg 结束
-      ),  // Scaffold 结束
-    ),  // AnnotatedRegion 结束
-  );
+            ),
+          ),
+        );
       },
     );
   }
