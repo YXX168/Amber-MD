@@ -14,18 +14,18 @@ if (localPropertiesFile.exists()) {
 
 def flutterVersionCode = localProperties.getProperty('flutter.versionCode')
 if (flutterVersionCode == null) {
-    flutterVersionCode = '550'
+    flutterVersionCode = '600'
 }
 
 def flutterVersionName = localProperties.getProperty('flutter.versionName')
 if (flutterVersionName == null) {
-    flutterVersionName = '5.5.0'
+    flutterVersionName = '6.0.0'
 }
 
 android {
     namespace "com.amber.amber_md_viewer"
     compileSdk 35
-    ndkVersion "27.0.12077973"
+    ndkVersion flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_11
@@ -56,8 +56,3 @@ flutter {
 }
 
 dependencies {}
-
-tasks.withType(JavaCompile).configureEach {
-    options.fork = true
-    options.forkOptions.jvmArgs += ['-Xmx2g']
-}

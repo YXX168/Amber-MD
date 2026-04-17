@@ -1,7 +1,7 @@
 name: amber_md
-description: A beautiful glassmorphism Markdown viewer.
+description: Amber MD - A beautiful glassmorphism Markdown viewer.
 publish_to: 'none'
-version: 5.5.0+550
+version: 6.0.0+600
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
@@ -27,3 +27,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/icon.svg

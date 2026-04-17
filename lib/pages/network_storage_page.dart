@@ -1,0 +1,757 @@
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:path_provider/path_provider.dart';
+
+import '../models/app_theme.dart';
+import '../models/remote_file.dart';
+import '../pages/home_page.dart';
+import '../providers/theme_provider.dart';
+import '../services/preferences_service.dart';
+import '../services/webdav_service.dart';
+import '../widgets/animated_gradient_bg.dart';
+import '../widgets/animated_list_item.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/glass_icon_button.dart';
+import '../widgets/scale_on_tap.dart';
+
+/// 网络存储页面 — WebDAV 客户端
+class NetworkStoragePage extends StatefulWidget {
+  final String storageType;
+
+  const NetworkStoragePage({super.key, required this.storageType});
+
+  @override
+  State<NetworkStoragePage> createState() => _NetworkStoragePageState();
+}
+
+class _NetworkStoragePageState extends State<NetworkStoragePage>
+    with TickerProviderStateMixin {
+  bool _connected = false;
+  bool _connecting = false;
+  String? _error;
+  bool _rememberPassword = true;
+
+  // 动画控制器
+  late AnimationController _fileListAnimController;
+  late Animation<double> _fileListAnim;
+  late AnimationController _errorAnimController;
+  late Animation<Offset> _errorAnim;
+
+  // WebDAV 字段
+  final _webdavUrl = TextEditingController();
+  final _webdavUser = TextEditingController();
+  final _webdavPass = TextEditingController();
+  WebDavService? _webdavService;
+  String _currentPath = '/';
+
+  final List<RemoteFile> _files = [];
+
+  @override
+  void initState() {
+    super.initState();
+
+    _fileListAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+    _fileListAnim = CurvedAnimation(
+      parent: _fileListAnimController,
+      curve: Curves.easeOutCubic,
+    );
+
+    _errorAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+    _errorAnim = TweenSequence<Offset>([
+      TweenSequenceItem(
+          tween: Tween<Offset>(begin: Offset.zero, end: const Offset(0.05, 0)),
+          weight: 2),
+      TweenSequenceItem(
+          tween: Tween<Offset>(
+              begin: const Offset(0.05, 0), end: const Offset(-0.05, 0)),
+          weight: 2),
+      TweenSequenceItem(
+          tween: Tween<Offset>(
+              begin: const Offset(-0.05, 0), end: const Offset(0.05, 0)),
+          weight: 2),
+      TweenSequenceItem(
+          tween: Tween<Offset>(begin: const Offset(0.05, 0), end: Offset.zero),
+          weight: 2),
+    ]).animate(CurvedAnimation(
+        parent: _errorAnimController, curve: Curves.easeInOut));
+
+    _loadSavedWebdavInfo();
+  }
+
+  Future<void> _loadSavedWebdavInfo() async {
+    final savedUrl = PreferencesService.webdavUrl;
+    final savedUser = PreferencesService.webdavUsername;
+    final savedPass = PreferencesService.webdavPassword;
+    final savedRemember = PreferencesService.webdavRemember;
+    if (savedUrl.isNotEmpty) {
+      _webdavUrl.text = savedUrl;
+      _webdavUser.text = savedUser;
+      _webdavPass.text = savedPass;
+      _rememberPassword = savedRemember;
+      if (mounted) setState(() {});
+    }
+  }
+
+  Future<void> _saveWebdavInfo() async {
+    await PreferencesService.setWebdavCredentials(
+      url: _webdavUrl.text.trim(),
+      username: _webdavUser.text.trim(),
+      password: _webdavPass.text,
+      remember: _rememberPassword,
+    );
+  }
+
+  Future<void> _clearSavedWebdavInfo() async {
+    await PreferencesService.clearWebdavCredentials();
+    _webdavUrl.clear();
+    _webdavUser.clear();
+    _webdavPass.clear();
+    _rememberPassword = true;
+    setState(() {});
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('已清除保存的连接信息',
+              style: GoogleFonts.inter(color: Colors.white)),
+          backgroundColor: Colors.redAccent.withValues(alpha: 0.8),
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _webdavUrl.dispose();
+    _webdavUser.dispose();
+    _webdavPass.dispose();
+    _fileListAnimController.dispose();
+    _errorAnimController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _connect() async {
+    setState(() {
+      _connecting = true;
+      _error = null;
+    });
+    _errorAnimController.reset();
+
+    try {
+      debugPrint('[WebDAV] 开始连接: ${_webdavUrl.text}');
+      var url = _webdavUrl.text.trim();
+      final user = _webdavUser.text.trim();
+      final pass = _webdavPass.text;
+
+      if (url.isEmpty) throw Exception('请输入服务器地址');
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        url = 'http://$url';
+      }
+      if (url.endsWith('/')) url = url.substring(0, url.length - 1);
+
+      final uri = Uri.tryParse(url);
+      if (uri == null || uri.host.isEmpty) {
+        throw Exception('服务器地址格式不正确，请检查输入');
+      }
+
+      _webdavService = WebDavService(
+        baseUrl: url,
+        username: user,
+        password: pass,
+      );
+
+      final list = await _webdavService!.propfind('/');
+      _files.clear();
+      _files.addAll(list);
+      _currentPath = '/';
+
+      await _saveWebdavInfo();
+      if (mounted) {
+        _fileListAnimController.forward(from: 0);
+        setState(() {
+          _connecting = false;
+          _connected = true;
+        });
+      }
+    } catch (e) {
+      debugPrint('[WebDAV] 连接失败: $e');
+      String errorMsg;
+      final msg = e.toString().replaceFirst('Exception: ', '');
+      if (msg.contains('Failed host lookup') ||
+          msg.contains('DNS') ||
+          msg.contains('无法解析')) {
+        errorMsg = '无法解析服务器地址，请检查域名是否正确或网络连接';
+      } else if (msg.contains('timed out') ||
+          msg.contains('Timeout') ||
+          msg.contains('超时')) {
+        errorMsg = '连接超时，请检查服务器地址和网络连接';
+      } else if (msg.contains('认证失败') ||
+          msg.contains('401') ||
+          msg.contains('403')) {
+        errorMsg = '用户名或密码错误，请重新输入';
+      } else if (msg.contains('Connection refused') ||
+          msg.contains('拒绝')) {
+        errorMsg = '服务器拒绝连接，请检查端口或服务是否启动';
+      } else {
+        errorMsg = msg;
+      }
+      if (mounted) {
+        setState(() {
+          _connecting = false;
+          _connected = false;
+          _error = errorMsg;
+        });
+        _errorAnimController.forward(from: 0);
+      }
+    }
+  }
+
+  Future<void> _navigateDir(String dirName) async {
+    if (_webdavService == null) return;
+    final newPath = _currentPath.endsWith('/')
+        ? '$_currentPath$dirName'
+        : '$_currentPath/$dirName';
+    try {
+      final list = await _webdavService!.propfind(newPath);
+      _files.clear();
+      _files.addAll(list);
+      if (mounted) {
+        _fileListAnimController.forward(from: 0);
+        setState(() =>
+            _currentPath = newPath.endsWith('/') ? newPath : '$newPath/');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('无法打开文件夹: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _downloadAndOpen(RemoteFile file) async {
+    if (_webdavService == null) return;
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('正在下载: ${file.name}'),
+          duration: const Duration(seconds: 30),
+        ),
+      );
+      final remotePath = _currentPath.endsWith('/')
+          ? '$_currentPath${file.name}'
+          : '$_currentPath/${file.name}';
+      final tempDir = await getTemporaryDirectory();
+      final localPath = '${tempDir.path}/_amber_webdav_${file.name}';
+      await _webdavService!.downloadFile(remotePath, localPath);
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        Navigator.pushNamed(context, '/reader', arguments: {
+          'path': localPath,
+          'fileType': getFileType(localPath),
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('下载失败: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _goUp() async {
+    if (_webdavService == null || _currentPath == '/') return;
+    final parts = _currentPath.split('/')..removeWhere((s) => s.isEmpty);
+    if (parts.length <= 1) {
+      await _navigateTo('/');
+      return;
+    }
+    parts.removeLast();
+    final newPath = '/${parts.join('/')}';
+    await _navigateTo(newPath);
+  }
+
+  Future<void> _navigateTo(String path) async {
+    if (_webdavService == null) return;
+    try {
+      final list = await _webdavService!.propfind(path);
+      _files.clear();
+      _files.addAll(list);
+      if (mounted) {
+        _fileListAnimController.forward(from: 0);
+        setState(
+            () => _currentPath = path.endsWith('/') ? path : '$path/');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('导航失败: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _disconnect() async {
+    setState(() {
+      _connected = false;
+      _files.clear();
+      _currentPath = '/';
+      _webdavService = null;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<int>(
+      valueListenable: globalThemeVersion,
+      builder: (context, _, __) {
+        final tp = ThemeProvider.of(context);
+        final theme = tp.currentTheme;
+        final isDark = theme.brightness == Brightness.dark;
+
+        return AnnotatedRegion<SystemUiOverlayStyle>(
+          value: isDark
+              ? const SystemUiOverlayStyle(
+                  statusBarColor: Colors.transparent,
+                  statusBarIconBrightness: Brightness.light,
+                )
+              : const SystemUiOverlayStyle(
+                  statusBarColor: Colors.transparent,
+                  statusBarIconBrightness: Brightness.dark,
+                ),
+          child: Scaffold(
+            extendBody: true,
+            extendBodyBehindAppBar: true,
+            body: AnimatedGradientBg(
+              child: SafeArea(
+                child: Column(
+                  children: [
+                    // 顶部栏
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+                      child: GlassCard(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        child: Row(
+                          children: [
+                            GlassIconButton(
+                              icon: Icons.arrow_back_rounded,
+                              onTap: _connected
+                                  ? _disconnect
+                                  : () => Navigator.pop(context),
+                            ),
+                            const SizedBox(width: 12),
+                            Icon(Icons.cloud_rounded,
+                                color: theme.primaryColor, size: 22),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                _connected ? 'WebDAV' : '网络存储',
+                                style: GoogleFonts.inter(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: theme.textColor,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (_connected) ...[
+                              GlassIconButton(
+                                icon: Icons.refresh_rounded,
+                                onTap: () =>
+                                    _navigateTo(_currentPath),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // 内容区
+                    Expanded(
+                      child: _connected
+                          ? _buildFileList(theme, isDark)
+                          : _buildLoginForm(theme, isDark),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildLoginForm(AppTheme theme, bool isDark) {
+    return SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        8,
+        20,
+        MediaQuery.of(context).padding.bottom + 40,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 服务器地址
+          Text(
+            '服务器地址',
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: theme.textSecondary.withValues(alpha: 0.6),
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 8),
+          GlassCard(
+            borderRadius: 14,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: TextField(
+              controller: _webdavUrl,
+              style: GoogleFonts.inter(
+                  fontSize: 14, color: theme.textColor),
+              decoration: InputDecoration(
+                hintText: '例如: https://dav.example.com',
+                hintStyle: GoogleFonts.inter(
+                  fontSize: 14,
+                  color: theme.textSecondary.withValues(alpha: 0.3),
+                ),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                isDense: true,
+                prefixIcon: Icon(Icons.dns_rounded,
+                    color: theme.primaryColor, size: 20),
+              ),
+              cursorColor: theme.primaryColor,
+              keyboardType: TextInputType.url,
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // 用户名
+          Text(
+            '用户名',
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: theme.textSecondary.withValues(alpha: 0.6),
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 8),
+          GlassCard(
+            borderRadius: 14,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: TextField(
+              controller: _webdavUser,
+              style: GoogleFonts.inter(
+                  fontSize: 14, color: theme.textColor),
+              decoration: InputDecoration(
+                hintText: '输入用户名',
+                hintStyle: GoogleFonts.inter(
+                  fontSize: 14,
+                  color: theme.textSecondary.withValues(alpha: 0.3),
+                ),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                isDense: true,
+                prefixIcon: Icon(Icons.person_rounded,
+                    color: theme.primaryColor, size: 20),
+              ),
+              cursorColor: theme.primaryColor,
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // 密码
+          Text(
+            '密码',
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: theme.textSecondary.withValues(alpha: 0.6),
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 8),
+          GlassCard(
+            borderRadius: 14,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: TextField(
+              controller: _webdavPass,
+              obscureText: true,
+              style: GoogleFonts.inter(
+                  fontSize: 14, color: theme.textColor),
+              decoration: InputDecoration(
+                hintText: '输入密码',
+                hintStyle: GoogleFonts.inter(
+                  fontSize: 14,
+                  color: theme.textSecondary.withValues(alpha: 0.3),
+                ),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                isDense: true,
+                prefixIcon: Icon(Icons.lock_rounded,
+                    color: theme.primaryColor, size: 20),
+              ),
+              cursorColor: theme.primaryColor,
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // 记住密码 + 清除信息
+          Row(
+            children: [
+              GestureDetector(
+                onTap: () => setState(
+                    () => _rememberPassword = !_rememberPassword),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _rememberPassword
+                          ? Icons.check_box_rounded
+                          : Icons.check_box_outline_blank_rounded,
+                      color: _rememberPassword
+                          ? theme.primaryColor
+                          : theme.textSecondary.withValues(alpha: 0.4),
+                      size: 22,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '记住密码',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        color: _rememberPassword
+                            ? theme.textColor
+                            : theme.textSecondary.withValues(alpha: 0.5),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              GestureDetector(
+                onTap: _clearSavedWebdavInfo,
+                child: Text(
+                  '清除保存',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: Colors.redAccent.withValues(alpha: 0.6),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+
+          // 连接按钮
+          ScaleOnTap(
+            onTap: _connecting ? null : _connect,
+            child: GlassCard(
+              borderRadius: 14,
+              padding: EdgeInsets.zero,
+              color: theme.primaryColor.withValues(alpha: 0.15),
+              border: Border.all(
+                  color: theme.primaryColor.withValues(alpha: 0.3)),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                width: double.infinity,
+                child: Center(
+                  child: _connecting
+                      ? SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            color: theme.primaryColor,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.link_rounded,
+                                color: theme.primaryColor, size: 20),
+                            const SizedBox(width: 8),
+                            Text(
+                              '连接',
+                              style: GoogleFonts.inter(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: theme.primaryColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                ),
+              ),
+            ),
+          ),
+
+          // 错误信息
+          if (_error != null) ...[
+            const SizedBox(height: 16),
+            SlideTransition(
+              position: _errorAnim,
+              child: GlassCard(
+                borderRadius: 12,
+                padding: const EdgeInsets.all(14),
+                color: Colors.redAccent.withValues(alpha: 0.1),
+                border: Border.all(
+                    color: Colors.redAccent.withValues(alpha: 0.2)),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.error_outline_rounded,
+                        color: Colors.redAccent, size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        _error!,
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          color: Colors.redAccent,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFileList(AppTheme theme, bool isDark) {
+    return FadeTransition(
+      opacity: _fileListAnim,
+      child: Column(
+        children: [
+          // 当前路径
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: GlassCard(
+              borderRadius: 12,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              child: Row(
+                children: [
+                  Icon(Icons.folder_open_rounded,
+                      color: theme.primaryColor, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _currentPath,
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: theme.textColor,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (_currentPath != '/')
+                    ScaleOnTap(
+                      onTap: _goUp,
+                      child: Padding(
+                        padding: const EdgeInsets.all(4),
+                        child: Icon(Icons.arrow_upward_rounded,
+                            color: theme.primaryColor, size: 20),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // 文件列表
+          Expanded(
+            child: _files.isEmpty
+                ? Center(
+                    child: Text(
+                      '空文件夹',
+                      style: GoogleFonts.inter(
+                        fontSize: 15,
+                        color: theme.textSecondary.withValues(alpha: 0.5),
+                      ),
+                    ),
+                  )
+                : ListView.builder(
+                    padding: EdgeInsets.fromLTRB(
+                      20,
+                      0,
+                      20,
+                      MediaQuery.of(context).padding.bottom + 40,
+                    ),
+                    itemCount: _files.length,
+                    itemBuilder: (context, index) {
+                      final file = _files[index];
+                      return AnimatedListItem(
+                        index: index,
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: ScaleOnTap(
+                            onTap: file.isDirectory
+                                ? () => _navigateDir(file.name)
+                                : () => _downloadAndOpen(file),
+                            child: GlassCard(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    file.isDirectory
+                                        ? Icons.folder_rounded
+                                        : Icons.insert_drive_file_rounded,
+                                    color: file.isDirectory
+                                        ? theme.primaryColor
+                                        : theme.accentColor,
+                                    size: 22,
+                                  ),
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Text(
+                                      file.name,
+                                      style: GoogleFonts.inter(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                        color: theme.textColor,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  if (file.isDirectory)
+                                    Icon(Icons.chevron_right_rounded,
+                                        color: theme.textSecondary
+                                            .withValues(alpha: 0.3),
+                                        size: 20),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}

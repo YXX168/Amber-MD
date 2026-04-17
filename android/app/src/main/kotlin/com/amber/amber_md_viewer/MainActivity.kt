@@ -29,7 +29,6 @@ class MainActivity : FlutterActivity() {
                             val uri = Uri.parse(uriStr)
                             val contentResolver: ContentResolver = contentResolver
 
-                            // Get file name
                             var fileName = "shared_file"
                             contentResolver.query(uri, null, null, null, null)?.use { cursor ->
                                 if (cursor.moveToFirst()) {
@@ -40,7 +39,6 @@ class MainActivity : FlutterActivity() {
                                 }
                             }
 
-                            // Copy to cache
                             val tempFile = File(cacheDir, "_amber_shared_$fileName")
                             contentResolver.openInputStream(uri)?.use { inputStream ->
                                 FileOutputStream(tempFile).use { outputStream ->
