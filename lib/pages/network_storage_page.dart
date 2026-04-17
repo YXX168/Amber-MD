@@ -356,7 +356,7 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
                 ),
               ],
             ),
-            backgroundColor: theme.warningColor.withValues(alpha: 0.85),
+            backgroundColor: const Color(0xFFE57373).withValues(alpha: 0.85),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             margin: const EdgeInsets.fromLTRB(20, 0, 20, 24),
