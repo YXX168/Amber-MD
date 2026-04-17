@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../providers/theme_provider.dart';
 
-/// 空状态动画组件 — 脉冲动画图标 + 提示文字
+/// 空状态动画组件 — 柔和呼吸光效 + 提示文字
 class EmptyState extends StatefulWidget {
   final VoidCallback? onPick;
 
@@ -21,7 +21,7 @@ class _EmptyStateState extends State<EmptyState>
     super.initState();
     _ctrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2200),
+      duration: const Duration(milliseconds: 3000),
     )..repeat(reverse: true);
   }
 
@@ -43,43 +43,39 @@ class _EmptyStateState extends State<EmptyState>
           AnimatedBuilder(
             animation: _ctrl,
             builder: (context, child) {
-              return Transform.scale(
-                scale: 1.0 + _ctrl.value * 0.15,
-                child: Transform.rotate(
-                  angle: _ctrl.value * 0.08,
-                  child: Container(
-                    width: 100,
-                    height: 100,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          theme.primaryColor
-                              .withValues(alpha: 0.3 + _ctrl.value * 0.15),
-                          theme.accentColor
-                              .withValues(alpha: 0.1 + _ctrl.value * 0.1),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(30),
-                      border: Border.all(
-                        color: theme.primaryColor
-                            .withValues(alpha: 0.15 + _ctrl.value * 0.25),
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: theme.primaryColor
-                              .withValues(alpha: 0.15 + _ctrl.value * 0.3),
-                          blurRadius: 30 + _ctrl.value * 25,
-                          spreadRadius: 3 + _ctrl.value * 8,
-                        ),
-                      ],
-                    ),
-                    child: Icon(
-                      Icons.description_rounded,
-                      size: 44,
-                      color: theme.textSecondary
-                          .withValues(alpha: 0.6 + _ctrl.value * 0.35),
-                    ),
+              // 柔和呼吸光效：光晕扩散 + 图标透明度微变，不倾斜不缩放
+              final glowAlpha = 0.12 + _ctrl.value * 0.18;
+              final iconAlpha = 0.45 + _ctrl.value * 0.2;
+              return Container(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      theme.primaryColor.withValues(alpha: glowAlpha),
+                      theme.accentColor.withValues(alpha: glowAlpha * 0.5),
+                    ],
                   ),
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(
+                    color: theme.primaryColor
+                        .withValues(alpha: 0.08 + _ctrl.value * 0.12),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: theme.primaryColor
+                          .withValues(alpha: glowAlpha * 0.6),
+                      blurRadius: 28 + _ctrl.value * 20,
+                      spreadRadius: 2 + _ctrl.value * 6,
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  Icons.description_rounded,
+                  size: 42,
+                  color: theme.textSecondary.withValues(alpha: iconAlpha),
                 ),
               );
             },

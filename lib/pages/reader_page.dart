@@ -35,6 +35,9 @@ class _ReaderPageState extends State<ReaderPage> {
   String _content = '';
   String _title = '';
   bool _loading = true;
+  bool _contentReady = false;
+  late AnimationController _fadeController;
+  late Animation<double> _fadeAnimation;
   final ScrollController _scrollCtrl = ScrollController();
   bool _showBackToTop = false;
   Timer? _backToTopHideTimer;
@@ -62,6 +65,14 @@ class _ReaderPageState extends State<ReaderPage> {
     super.initState();
     _title = p.basename(widget.filePath);
     _editController = TextEditingController();
+    _fadeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 350),
+    );
+    _fadeAnimation = CurvedAnimation(
+      parent: _fadeController,
+      curve: Curves.easeOutCubic,
+    );
     _loadFile();
 
     _scrollCtrl.addListener(_onScroll);
@@ -123,6 +134,7 @@ class _ReaderPageState extends State<ReaderPage> {
     _scrollCtrl.dispose();
     _editController.dispose();
     _searchController.dispose();
+    _fadeController.dispose();
     super.dispose();
   }
 
@@ -145,6 +157,12 @@ class _ReaderPageState extends State<ReaderPage> {
           _content = content;
           _loading = false;
         });
+        // 内容就绪后播放淡入动画，避免掉帧
+        await Future.delayed(const Duration(milliseconds: 50));
+        if (mounted) {
+          _fadeController.forward(from: 0);
+          setState(() => _contentReady = true);
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -152,6 +170,11 @@ class _ReaderPageState extends State<ReaderPage> {
           _content = '# 读取失败\n\n无法读取文件:\n```\n$e\n```';
           _loading = false;
         });
+        await Future.delayed(const Duration(milliseconds: 50));
+        if (mounted) {
+          _fadeController.forward(from: 0);
+          setState(() => _contentReady = true);
+        }
       }
     }
   }
@@ -270,6 +293,88 @@ class _ReaderPageState extends State<ReaderPage> {
     _scrollToMatch(newIdx);
   }
 
+  /// 骨架屏加载动画 — 文件读取时显示，避免内容突然出现导致掉帧
+  Widget _buildLoadingSkeleton(AppTheme theme) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ShimmerSweep(
+            child: Container(
+              padding: const EdgeInsets.all(28),
+              decoration: BoxDecoration(
+                color: theme.primaryColor.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                    color: theme.primaryColor.withValues(alpha: 0.15)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 模拟标题行
+                  Container(
+                    width: 160,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: theme.primaryColor.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // 模拟正文行
+                  Container(
+                    width: double.infinity,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: theme.primaryColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: 240,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: theme.primaryColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: 200,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: theme.primaryColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // 加载指示器
+                  SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      color: theme.primaryColor.withValues(alpha: 0.6),
+                      strokeWidth: 2.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            '正在加载文档...',
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              color: theme.textSecondary.withValues(alpha: 0.4),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _prevMatch() {
     if (_matchIndices.isEmpty) return;
     final newIdx =
@@ -372,25 +477,10 @@ class _ReaderPageState extends State<ReaderPage> {
             extendBodyBehindAppBar: true,
             body: AnimatedGradientBg(
               child: _loading
-                  ? Center(
-                      child: ShimmerSweep(
-                        child: Container(
-                          padding: const EdgeInsets.all(24),
-                          decoration: BoxDecoration(
-                            color: theme.primaryColor.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                                color: theme.primaryColor
-                                    .withValues(alpha: 0.2)),
-                          ),
-                          child: CircularProgressIndicator(
-                            color: theme.primaryColor,
-                            strokeWidth: 3,
-                          ),
-                        ),
-                      ),
-                    )
-                  : Stack(
+                  ? _buildLoadingSkeleton(theme)
+                  : FadeTransition(
+                      opacity: _fadeAnimation,
+                      child: Stack(
                       children: [
                         // 内容
                         SafeArea(
@@ -524,6 +614,7 @@ class _ReaderPageState extends State<ReaderPage> {
                         ),
                       ],
                     ),
+                  ),
             ),
           ),
         );
