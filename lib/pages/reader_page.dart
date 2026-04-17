@@ -490,7 +490,7 @@ class _ReaderPageState extends State<ReaderPage> with TickerProviderStateMixin {
                           child: FadeTransition(
                             opacity: _fadeAnimation,
                             child: Stack(
-                      children: [
+                              children: [
                         // 内容
                         SafeArea(
                           top: false,
@@ -628,7 +628,10 @@ class _ReaderPageState extends State<ReaderPage> with TickerProviderStateMixin {
               ),  // 内容 ScaleTransition 结束
             ),  // 预加载 FadeTransition 结束
           ),  // 预加载 ScaleTransition 结束
-        );
+        ),  // AnimatedGradientBg 结束
+      ),  // Scaffold 结束
+    ),  // AnnotatedRegion 结束
+  );
       },
     );
   }
