@@ -269,10 +269,56 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
 
   Future<void> _downloadAndOpen(RemoteFile file) async {
     if (_webdavService == null) return;
+    final tp = ThemeProvider.of(context);
+    final theme = tp.currentTheme;
+    
     try {
+      // 美观的下载提示
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('正在下载: ${file.name}'),
+          content: Row(
+            children: [
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '正在下载',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      file.name,
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        color: Colors.white.withValues(alpha: 0.7),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: theme.primaryColor.withValues(alpha: 0.85),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: const EdgeInsets.fromLTRB(20, 0, 20, 24),
           duration: const Duration(seconds: 30),
         ),
       );
@@ -293,7 +339,29 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
       if (mounted) {
         ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('下载失败: $e')),
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.error_outline_rounded, color: Colors.white, size: 18),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    '下载失败',
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: theme.warningColor.withValues(alpha: 0.85),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            margin: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+            duration: const Duration(seconds: 3),
+          ),
         );
       }
     }
