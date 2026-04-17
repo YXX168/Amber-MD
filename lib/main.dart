@@ -117,12 +117,8 @@ class GlassMdApp extends StatelessWidget {
             valueListenable: globalThemeVersion,
             builder: (context, _, __) {
               final theme = tp.currentTheme;
-              return AnimatedSwitcher(
-                duration: const Duration(milliseconds: 400),
-                switchInCurve: Curves.easeOutCubic,
-                switchOutCurve: Curves.easeInOut,
-                child: MaterialApp(
-                  key: ValueKey('app_${globalThemeVersion.value}'),
+              return MaterialApp(
+                key: const ValueKey('amber_md_app'),
                   title: 'Amber MD',
                   debugShowCheckedModeBanner: false,
                   localizationsDelegates: const [
@@ -222,7 +218,6 @@ class GlassMdApp extends StatelessWidget {
                     }
                     return null;
                   },
-                ),
               );
             },
           );
