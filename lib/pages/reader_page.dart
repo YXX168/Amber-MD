@@ -607,7 +607,10 @@ class _ReaderPageState extends State<ReaderPage> with TickerProviderStateMixin {
       children: [
         GlassIconButton(
           icon: Icons.arrow_back_rounded,
-          onTap: () => Navigator.pop(context),
+          onTap: () {
+            HapticFeedback.lightImpact();
+            Navigator.pop(context);
+          },
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -638,12 +641,18 @@ class _ReaderPageState extends State<ReaderPage> with TickerProviderStateMixin {
         ),
         GlassIconButton(
           icon: Icons.search_rounded,
-          onTap: _toggleSearch,
+          onTap: () {
+            HapticFeedback.lightImpact();
+            _toggleSearch();
+          },
         ),
         const SizedBox(width: 4),
         GlassIconButton(
           icon: Icons.edit_rounded,
-          onTap: _enterEditMode,
+          onTap: () {
+            HapticFeedback.mediumImpact();
+            _enterEditMode();
+          },
         ),
       ],
     );
@@ -657,7 +666,10 @@ class _ReaderPageState extends State<ReaderPage> with TickerProviderStateMixin {
       children: [
         GlassIconButton(
           icon: Icons.close_rounded,
-          onTap: _exitEditMode,
+          onTap: () {
+            HapticFeedback.lightImpact();
+            _exitEditMode();
+          },
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -685,7 +697,10 @@ class _ReaderPageState extends State<ReaderPage> with TickerProviderStateMixin {
         ),
         ScaleOnTap(
           scaleAmount: 0.94,
-          onTap: _saveFile,
+          onTap: () {
+            HapticFeedback.mediumImpact();
+            _saveFile();
+          },
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
             child: BackdropFilter(
@@ -693,7 +708,10 @@ class _ReaderPageState extends State<ReaderPage> with TickerProviderStateMixin {
               child: Material(
                 color: theme.primaryColor.withValues(alpha: 0.3),
                 child: InkWell(
-                  onTap: _saveFile,
+                  onTap: () {
+                    HapticFeedback.mediumImpact();
+                    _saveFile();
+                  },
                   child: Container(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 16, vertical: 8),
@@ -778,12 +796,18 @@ class _ReaderPageState extends State<ReaderPage> with TickerProviderStateMixin {
             const SizedBox(width: 4),
             GlassIconButton(
               icon: Icons.keyboard_arrow_up_rounded,
-              onTap: _prevMatch,
+              onTap: () {
+                HapticFeedback.selectionClick();
+                _prevMatch();
+              },
             ),
             const SizedBox(width: 2),
             GlassIconButton(
               icon: Icons.keyboard_arrow_down_rounded,
-              onTap: _nextMatch,
+              onTap: () {
+                HapticFeedback.selectionClick();
+                _nextMatch();
+              },
             ),
           ],
         ),

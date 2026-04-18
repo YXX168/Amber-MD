@@ -237,22 +237,28 @@ class _HomePageState extends State<HomePage> {
                             const SizedBox(width: 4),
                             GlassIconButton(
                               icon: Icons.folder_open_rounded,
-                              onTap: _pickFile,
+                              onTap: () {
+                                HapticFeedback.lightImpact();
+                                _pickFile();
+                              },
                               compact: true,
                             ),
                             const SizedBox(width: 2),
                             GlassIconButton(
                               icon: Icons.cloud_outlined,
-                              onTap: () => Navigator.pushNamed(
-                                  context, '/network_storage',
-                                  arguments: {'type': 'webdav'}),
+                              onTap: () {
+                                HapticFeedback.lightImpact();
+                                Navigator.pushNamed(context, '/network_storage', arguments: {'type': 'webdav'});
+                              },
                               compact: true,
                             ),
                             const SizedBox(width: 2),
                             GlassIconButton(
                               icon: Icons.settings_rounded,
-                              onTap: () =>
-                                  Navigator.pushNamed(context, '/settings'),
+                              onTap: () {
+                                HapticFeedback.lightImpact();
+                                Navigator.pushNamed(context, '/settings');
+                              },
                               compact: true,
                             ),
                           ],
@@ -294,12 +300,12 @@ class _HomePageState extends State<HomePage> {
                                   child: _FileCard(
                                     filePath: filePath,
                                     onTap: () {
+                                      HapticFeedback.lightImpact();
                                       _addToRecent(filePath);
-                                      Navigator.pushNamed(context, '/reader',
-                                          arguments: {
-                                            'path': filePath,
-                                            'fileType': getFileType(filePath),
-                                          });
+                                      Navigator.pushNamed(context, '/reader', arguments: {
+                                        'path': filePath,
+                                        'fileType': getFileType(filePath),
+                                      });
                                     },
                                     onDismiss: () => _removeRecent(filePath),
                                   ),

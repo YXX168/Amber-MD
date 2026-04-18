@@ -51,7 +51,10 @@ class SettingsPage extends StatelessWidget {
                           children: [
                             GlassIconButton(
                               icon: Icons.arrow_back_rounded,
-                              onTap: () => Navigator.pop(context),
+                              onTap: () {
+                                HapticFeedback.lightImpact();
+                                Navigator.pop(context);
+                              },
                             ),
                             const SizedBox(width: 12),
                             Icon(Icons.settings_rounded,
@@ -133,7 +136,10 @@ class SettingsPage extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.only(right: 8),
             child: ScaleOnTap(
-              onTap: () => tp.setTheme?.call(mode),
+              onTap: () {
+                HapticFeedback.selectionClick();
+                tp.setTheme?.call(mode);
+              },
               child: GlassCard(
                 borderRadius: 14,
                 padding:
@@ -201,7 +207,10 @@ class SettingsPage extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.only(right: 8),
             child: ScaleOnTap(
-              onTap: () => tp.setFontSize?.call(opt),
+              onTap: () {
+                HapticFeedback.selectionClick();
+                tp.setFontSize?.call(opt);
+              },
               child: GlassCard(
                 borderRadius: 12,
                 padding: const EdgeInsets.symmetric(vertical: 14),
@@ -246,7 +255,10 @@ class SettingsPage extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.only(right: 6),
             child: ScaleOnTap(
-              onTap: () => tp.setLetterSpacing?.call(sp),
+              onTap: () {
+                HapticFeedback.selectionClick();
+                tp.setLetterSpacing?.call(sp);
+              },
               child: GlassCard(
                 borderRadius: 12,
                 padding: const EdgeInsets.symmetric(vertical: 14),
@@ -290,7 +302,10 @@ class SettingsPage extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.only(right: 8),
             child: ScaleOnTap(
-              onTap: () => tp.setLineHeight?.call(h),
+              onTap: () {
+                HapticFeedback.selectionClick();
+                tp.setLineHeight?.call(h);
+              },
               child: GlassCard(
                 borderRadius: 12,
                 padding: const EdgeInsets.symmetric(vertical: 14),

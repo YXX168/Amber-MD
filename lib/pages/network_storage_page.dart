@@ -457,8 +457,14 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
                             GlassIconButton(
                               icon: Icons.arrow_back_rounded,
                               onTap: _connected
-                                  ? _disconnect
-                                  : () => Navigator.pop(context),
+                                  ? () {
+                                      HapticFeedback.lightImpact();
+                                      _disconnect();
+                                    }
+                                  : () {
+                                      HapticFeedback.lightImpact();
+                                      Navigator.pop(context);
+                                    },
                             ),
                             const SizedBox(width: 12),
                             Icon(Icons.cloud_rounded,
@@ -478,7 +484,10 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
                             if (_connected) ...[
                               GlassIconButton(
                                 icon: Icons.refresh_rounded,
-                                onTap: _refresh,
+                                onTap: () {
+                                  HapticFeedback.lightImpact();
+                                  _refresh();
+                                },
                               ),
                             ],
                           ],
@@ -884,7 +893,10 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
                                         HapticFeedback.lightImpact();
                                         _navigateDir(file.name);
                                       }
-                                    : () => _downloadAndOpen(file),
+                                    : () {
+                                        HapticFeedback.lightImpact();
+                                        _downloadAndOpen(file);
+                                      },
                                 child: GlassCard(
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 16, vertical: 14),
