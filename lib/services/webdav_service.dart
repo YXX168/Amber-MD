@@ -191,14 +191,16 @@ class WebDavService {
 
       // 解析重定向目标
       Uri redirectUri;
-      if (location.startsWith('http://') || location.startsWith('https://')) {
-        redirectUri = Uri.parse(location);
+      final locationUri = Uri.tryParse(location);
+      if (locationUri != null && locationUri.hasScheme) {
+        redirectUri = locationUri;
       } else if (location.startsWith('/')) {
         redirectUri = uri.replace(path: location);
       } else {
         // 相对路径
-        final basePath = uri.path.substring(
-            0, uri.path.lastIndexOf('/') + 1);
+        final basePath = uri.path.endsWith('/')
+            ? uri.path
+            : uri.path.substring(0, uri.path.lastIndexOf('/') + 1);
         redirectUri = uri.replace(path: basePath + location);
       }
 
@@ -331,7 +333,7 @@ class WebDavService {
         final sink = file.openWrite();
         try {
           await for (final chunk in streamedResp.stream) {
-            sink.add(chunk as Uint8List);
+            sink.add(chunk);
           }
           await sink.flush();
           await sink.close();

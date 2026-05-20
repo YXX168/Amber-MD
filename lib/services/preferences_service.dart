@@ -73,6 +73,10 @@ class PreferencesService {
       await prefs.setString(keyWebdavUrl, url);
       await prefs.setString(keyWebdavUsername, username);
       await prefs.setString(keyWebdavPassword, password);
+    } else {
+      await prefs.remove(keyWebdavUrl);
+      await prefs.remove(keyWebdavUsername);
+      await prefs.remove(keyWebdavPassword);
     }
     await prefs.setBool(keyWebdavRemember, remember);
   }
