@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -59,6 +61,10 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
   
   // 正在加载文件列表
   bool _loadingFiles = false;
+
+  // 下载浮层
+  OverlayEntry? _downloadOverlay;
+  Timer? _downloadOverlayTimer;
 
   @override
   void initState() {
@@ -191,6 +197,8 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
 
   @override
   void dispose() {
+    _downloadOverlayTimer?.cancel();
+    _downloadOverlay?.remove();
     _webdavUrl.dispose();
     _webdavUser.dispose();
     _webdavPass.dispose();
@@ -198,6 +206,109 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
     _errorAnimController.dispose();
     _navAnimController.dispose();
     super.dispose();
+  }
+
+  void _showDownloadOverlay(String fileName) {
+    _downloadOverlayTimer?.cancel();
+    _downloadOverlay?.remove();
+
+    final overlay = Overlay.of(context, rootOverlay: true);
+    if (overlay == null) return;
+
+    _downloadOverlay = OverlayEntry(
+      builder: (context) {
+        final tp = ThemeProvider.of(context);
+        final theme = tp.currentTheme;
+        return Positioned(
+          left: 18,
+          right: 18,
+          bottom: 24,
+          child: IgnorePointer(
+            ignoring: true,
+            child: Material(
+              color: Colors.transparent,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 360),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: theme.surfaceColor.withValues(alpha: 0.92),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: theme.primaryColor.withValues(alpha: 0.12),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.14),
+                          blurRadius: 24,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: theme.primaryColor.withValues(alpha: 0.12),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Center(
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.2,
+                              color: theme.primaryColor,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '正在下载',
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: theme.textColor,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                fileName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  color: theme.textSecondary.withValues(alpha: 0.72),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    overlay.insert(_downloadOverlay!);
+    _downloadOverlayTimer = Timer(const Duration(seconds: 20), _hideDownloadOverlay);
+  }
+
+  void _hideDownloadOverlay() {
+    _downloadOverlayTimer?.cancel();
+    _downloadOverlayTimer = null;
+    _downloadOverlay?.remove();
+    _downloadOverlay = null;
   }
 
   Future<void> _testConnection() async {
@@ -362,97 +473,30 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
 
   Future<void> _downloadAndOpen(RemoteFile file) async {
     if (_webdavService == null) return;
-    final tp = ThemeProvider.of(context);
-    final theme = tp.currentTheme;
-    
     try {
-      // 美观的下载提示
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  color: Colors.white,
-                  strokeWidth: 2,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '正在下载',
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      file.name,
-                      style: GoogleFonts.inter(
-                        fontSize: 11,
-                        color: Colors.white.withValues(alpha: 0.7),
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          backgroundColor: theme.primaryColor.withValues(alpha: 0.85),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          margin: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-          duration: const Duration(seconds: 30),
-        ),
-      );
+      _showDownloadOverlay(file.name);
       final remotePath = _currentPath.endsWith('/')
           ? '$_currentPath${file.name}'
           : '$_currentPath/${file.name}';
       final tempDir = await getTemporaryDirectory();
       final localPath = '${tempDir.path}/_amber_webdav_${file.name}';
       await _webdavService!.downloadFile(remotePath, localPath);
-      if (mounted) {
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        Navigator.pushNamed(context, '/reader', arguments: {
-          'path': localPath,
-          'fileType': getFileType(localPath),
-        });
-      }
+      if (!mounted) return;
+      _hideDownloadOverlay();
+      Navigator.pushNamed(context, '/reader', arguments: {
+        'path': localPath,
+        'fileType': getFileType(localPath),
+      });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        _hideDownloadOverlay();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.error_outline_rounded, color: Colors.white, size: 18),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    '下载失败',
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            backgroundColor: const Color(0xFFE57373).withValues(alpha: 0.85),
+            content: Text('下载失败: $e', style: GoogleFonts.inter(color: Colors.white)),
+            backgroundColor: const Color(0xFFE57373).withValues(alpha: 0.88),
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            margin: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            margin: const EdgeInsets.fromLTRB(20, 0, 20, 20),
             duration: const Duration(seconds: 3),
           ),
         );
