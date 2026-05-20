@@ -583,64 +583,91 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
             extendBodyBehindAppBar: true,
             body: AnimatedGradientBg(
               child: SafeArea(
-                child: Column(
-                  children: [
-                    // 顶部栏
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-                      child: GlassCard(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 8),
-                        child: Row(
-                          children: [
-                            GlassIconButton(
-                              icon: Icons.arrow_back_rounded,
-                              onTap: _connected
-                                  ? () {
-                                      HapticFeedback.lightImpact();
-                                      _disconnect();
-                                    }
-                                  : () {
-                                      HapticFeedback.lightImpact();
-                                      Navigator.pop(context);
-                                    },
-                            ),
-                            const SizedBox(width: 12),
-                            Icon(Icons.cloud_rounded,
-                                color: theme.primaryColor, size: 22),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                _connected ? 'WebDAV' : '网络存储',
-                                style: GoogleFonts.inter(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                  color: theme.textColor,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            if (_connected) ...[
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 260),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  layoutBuilder: (currentChild, previousChildren) {
+                    return Stack(
+                      fit: StackFit.expand,
+                      children: <Widget>[
+                        ...previousChildren,
+                        if (currentChild != null) currentChild,
+                      ],
+                    );
+                  },
+                  transitionBuilder: (child, animation) {
+                    return FadeTransition(
+                      opacity: animation,
+                      child: SlideTransition(
+                        position: Tween<Offset>(
+                          begin: const Offset(0.02, 0.0),
+                          end: Offset.zero,
+                        ).animate(animation),
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: Column(
+                    key: ValueKey<String>(_connected ? 'connected' : 'login'),
+                    children: [
+                      // 顶部栏
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+                        child: GlassCard(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                          child: Row(
+                            children: [
                               GlassIconButton(
-                                icon: Icons.refresh_rounded,
-                                onTap: () {
-                                  HapticFeedback.lightImpact();
-                                  _refresh();
-                                },
+                                icon: Icons.arrow_back_rounded,
+                                onTap: _connected
+                                    ? () {
+                                        HapticFeedback.lightImpact();
+                                        _disconnect();
+                                      }
+                                    : () {
+                                        HapticFeedback.lightImpact();
+                                        Navigator.pop(context);
+                                      },
                               ),
+                              const SizedBox(width: 12),
+                              Icon(Icons.cloud_rounded,
+                                  color: theme.primaryColor, size: 22),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  _connected ? 'WebDAV' : '网络存储',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                    color: theme.textColor,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (_connected) ...[
+                                GlassIconButton(
+                                  icon: Icons.refresh_rounded,
+                                  onTap: () {
+                                    HapticFeedback.lightImpact();
+                                    _refresh();
+                                  },
+                                ),
+                              ],
                             ],
-                          ],
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    // 内容区
-                    Expanded(
-                      child: _connected
-                          ? _buildFileList(theme, isDark)
-                          : _buildLoginForm(theme, isDark),
-                    ),
-                  ],
+                      const SizedBox(height: 8),
+                      // 内容区
+                      Expanded(
+                        child: _connected
+                            ? _buildFileList(theme, isDark)
+                            : _buildLoginForm(theme, isDark),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),

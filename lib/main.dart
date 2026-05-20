@@ -117,18 +117,33 @@ class GlassMdApp extends StatelessWidget {
             valueListenable: globalThemeVersion,
             builder: (context, _, __) {
               final theme = tp.currentTheme;
-              return ValueListenableBuilder<double>(
-                valueListenable: globalThemeTransition,
-                builder: (context, opacity, child) {
-                  return AnimatedOpacity(
-                    opacity: opacity.clamp(0.0, 1.0),
-                    duration: const Duration(milliseconds: 180),
-                    curve: Curves.easeOutCubic,
-                    child: child,
+              return AnimatedSwitcher(
+                duration: const Duration(milliseconds: 260),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeInCubic,
+                layoutBuilder: (currentChild, previousChildren) {
+                  return Stack(
+                    fit: StackFit.expand,
+                    children: <Widget>[
+                      ...previousChildren,
+                      if (currentChild != null) currentChild,
+                    ],
+                  );
+                },
+                transitionBuilder: (child, animation) {
+                  return FadeTransition(
+                    opacity: animation,
+                    child: SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(0.01, 0.0),
+                        end: Offset.zero,
+                      ).animate(animation),
+                      child: child,
+                    ),
                   );
                 },
                 child: MaterialApp(
-                  key: const ValueKey('amber_md_app'),
+                  key: ValueKey<String>('amber_md_${theme.id}'),
                   title: 'Amber MD',
                   debugShowCheckedModeBanner: false,
                   localizationsDelegates: const [
