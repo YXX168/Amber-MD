@@ -148,6 +148,12 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
     await _storeRecentWebdavUrl(normalizedUrl);
   }
 
+  Future<void> _saveLastPathForCurrentConnection() async {
+    final url = _normalizeWebdavUrl(_webdavUrl.text);
+    if (url.isEmpty) return;
+    await PreferencesService.setWebdavLastPath(url, _currentPath);
+  }
+
   Future<void> _storeRecentWebdavUrl(String url) async {
     if (url.isEmpty) return;
     _recentWebdavUrls.remove(url);
@@ -162,6 +168,7 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
   Future<void> _clearSavedWebdavInfo() async {
     await PreferencesService.clearWebdavCredentials();
     await PreferencesService.clearWebdavRecent();
+    await PreferencesService.clearWebdavLastPaths();
     _recentWebdavUrls.clear();
     _webdavUrl.clear();
     _webdavUser.clear();
@@ -193,6 +200,50 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
     super.dispose();
   }
 
+  Future<void> _testConnection() async {
+    setState(() {
+      _connecting = true;
+      _error = null;
+    });
+    _errorAnimController.reset();
+
+    try {
+      final url = _normalizeWebdavUrl(_webdavUrl.text);
+      final user = _webdavUser.text.trim();
+      final pass = _webdavPass.text;
+      if (url.isEmpty) throw Exception('请输入服务器地址');
+
+      final service = WebDavService(
+        baseUrl: url,
+        username: user,
+        password: pass,
+      );
+      await service.propfind('/');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('连接测试成功', style: GoogleFonts.inter(color: Colors.white)),
+          backgroundColor: Colors.green.withValues(alpha: 0.85),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    } catch (e) {
+      final msg = e.toString().replaceFirst('Exception: ', '');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('测试失败: $msg')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _connecting = false;
+        });
+      }
+    }
+  }
+
   Future<void> _connect() async {
     setState(() {
       _connecting = true;
@@ -219,10 +270,11 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
         password: pass,
       );
 
-      final list = await _webdavService!.propfind('/');
+      final startPath = PreferencesService.getWebdavLastPath(url) ?? '/';
+      final list = await _webdavService!.propfind(startPath);
       _files.clear();
       _files.addAll(list);
-      _currentPath = '/';
+      _currentPath = startPath.endsWith('/') ? startPath : '$startPath/';
       _pathHistory.clear();
       _listKey++;
 
@@ -234,6 +286,7 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
           _connecting = false;
           _connected = true;
         });
+        await _saveLastPathForCurrentConnection();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('WebDAV 已连接', style: GoogleFonts.inter(color: Colors.white)),
@@ -296,6 +349,7 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
         _currentPath = newPath.endsWith('/') ? newPath : '$newPath/';
         _fileListAnimController.forward(from: 0);
         setState(() {});
+        await _saveLastPathForCurrentConnection();
       }
     } catch (e) {
       if (mounted) {
@@ -438,6 +492,7 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
         _currentPath = path.endsWith('/') ? path : '$path/';
         setState(() => _loadingFiles = false);
         _fileListAnimController.forward(from: 0);
+        await _saveLastPathForCurrentConnection();
       }
     } catch (e) {
       if (mounted) {
@@ -450,6 +505,7 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
   }
 
   Future<void> _disconnect() async {
+    await _saveLastPathForCurrentConnection();
     setState(() {
       _connected = false;
       _files.clear();
@@ -736,6 +792,10 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
                         HapticFeedback.selectionClick();
                         setState(() {
                           _webdavUrl.text = url;
+                          final savedPath = PreferencesService.getWebdavLastPath(url);
+                          if (savedPath != null) {
+                            debugPrint('[WebDAV] 已恢复上次路径: $savedPath');
+                          }
                         });
                       },
                       child: Container(
@@ -764,46 +824,75 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
           ],
 
           // 连接按钮
-          ScaleOnTap(
-            onTap: _connecting ? null : _connect,
-            child: GlassCard(
-              borderRadius: 14,
-              padding: EdgeInsets.zero,
-              color: theme.primaryColor.withValues(alpha: 0.15),
-              border: Border.all(
-                  color: theme.primaryColor.withValues(alpha: 0.3)),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                width: double.infinity,
-                child: Center(
-                  child: _connecting
-                      ? SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            color: theme.primaryColor,
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.link_rounded,
-                                color: theme.primaryColor, size: 20),
-                            const SizedBox(width: 8),
-                            Text(
-                              '连接',
-                              style: GoogleFonts.inter(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                color: theme.primaryColor,
-                              ),
-                            ),
-                          ],
+          Row(
+            children: [
+              Expanded(
+                child: ScaleOnTap(
+                  onTap: _connecting ? null : _testConnection,
+                  child: GlassCard(
+                    borderRadius: 14,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    color: theme.textSecondary.withValues(alpha: 0.07),
+                    border: Border.all(
+                        color: theme.textSecondary.withValues(alpha: 0.12)),
+                    child: Center(
+                      child: Text(
+                        '测试连接',
+                        style: GoogleFonts.inter(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: theme.textSecondary,
                         ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
-            ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ScaleOnTap(
+                  onTap: _connecting ? null : _connect,
+                  child: GlassCard(
+                    borderRadius: 14,
+                    padding: EdgeInsets.zero,
+                    color: theme.primaryColor.withValues(alpha: 0.15),
+                    border: Border.all(
+                        color: theme.primaryColor.withValues(alpha: 0.3)),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      width: double.infinity,
+                      child: Center(
+                        child: _connecting
+                            ? SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  color: theme.primaryColor,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.link_rounded,
+                                      color: theme.primaryColor, size: 20),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    '连接',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                      color: theme.primaryColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
 
           // 错误信息

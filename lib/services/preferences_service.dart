@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// SharedPreferences 封装服务
@@ -58,6 +60,7 @@ class PreferencesService {
   static const String keyWebdavPassword = 'webdav_password';
   static const String keyWebdavRemember = 'webdav_remember';
   static const String keyWebdavRecent = 'webdav_recent';
+  static const String keyWebdavLastPaths = 'webdav_last_paths';
 
   static String get webdavUrl => prefs.getString(keyWebdavUrl) ?? '';
   static String get webdavUsername => prefs.getString(keyWebdavUsername) ?? '';
@@ -94,4 +97,40 @@ class PreferencesService {
   }
 
   static Future<void> clearWebdavRecent() => prefs.remove(keyWebdavRecent);
+
+  static Map<String, String> get webdavLastPathMap {
+    final raw = prefs.getString(keyWebdavLastPaths);
+    if (raw == null || raw.isEmpty) return {};
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) {
+        return decoded.map(
+          (key, value) => MapEntry(key.toString(), value.toString()),
+        );
+      }
+    } catch (_) {}
+    return {};
+  }
+
+  static String? getWebdavLastPath(String url) {
+    final path = webdavLastPathMap[url];
+    if (path == null || path.isEmpty) return null;
+    return path;
+  }
+
+  static Future<void> setWebdavLastPath(String url, String path) async {
+    final map = webdavLastPathMap;
+    if (path.isEmpty || path == '/') {
+      map.remove(url);
+    } else {
+      map[url] = path;
+    }
+    if (map.isEmpty) {
+      await prefs.remove(keyWebdavLastPaths);
+    } else {
+      await prefs.setString(keyWebdavLastPaths, jsonEncode(map));
+    }
+  }
+
+  static Future<void> clearWebdavLastPaths() => prefs.remove(keyWebdavLastPaths);
 }
