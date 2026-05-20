@@ -148,6 +148,7 @@ class _HomePageState extends State<HomePage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
+            duration: const Duration(milliseconds: 500),
             content: Text('无法选择文件: $e',
                 style: GoogleFonts.inter(color: Colors.white)),
             backgroundColor: Colors.redAccent.withValues(alpha: 0.8),

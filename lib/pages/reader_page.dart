@@ -196,6 +196,7 @@ class _ReaderPageState extends State<ReaderPage> with TickerProviderStateMixin {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
+            duration: const Duration(milliseconds: 500),
             content: Text('文件已保存',
                 style: GoogleFonts.inter(color: Colors.white)),
             backgroundColor: theme.primaryColor.withValues(alpha: 0.8),
@@ -209,6 +210,7 @@ class _ReaderPageState extends State<ReaderPage> with TickerProviderStateMixin {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
+            duration: const Duration(milliseconds: 500),
             content: Text('保存失败: $e',
                 style: GoogleFonts.inter(color: Colors.white)),
             backgroundColor: Colors.redAccent.withValues(alpha: 0.8),

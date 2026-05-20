@@ -184,6 +184,7 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
+          duration: const Duration(milliseconds: 500),
           content: Text('已清除保存的连接信息',
               style: GoogleFonts.inter(color: Colors.white)),
           backgroundColor: Colors.redAccent.withValues(alpha: 0.8),
@@ -333,6 +334,7 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
+          duration: const Duration(milliseconds: 500),
           content: Text('连接测试成功', style: GoogleFonts.inter(color: Colors.white)),
           backgroundColor: Colors.green.withValues(alpha: 0.85),
           behavior: SnackBarBehavior.floating,
@@ -343,7 +345,10 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
       final msg = e.toString().replaceFirst('Exception: ', '');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('测试失败: $msg')),
+          SnackBar(
+            duration: const Duration(milliseconds: 500),
+            content: Text('测试失败: $msg'),
+          ),
         );
       }
     } finally {
@@ -400,6 +405,7 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
         await _saveLastPathForCurrentConnection();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
+            duration: const Duration(milliseconds: 500),
             content: Text('WebDAV 已连接', style: GoogleFonts.inter(color: Colors.white)),
             backgroundColor: Colors.green.withValues(alpha: 0.85),
             behavior: SnackBarBehavior.floating,
@@ -465,7 +471,10 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('无法打开文件夹: $e')),
+          SnackBar(
+            duration: const Duration(milliseconds: 500),
+            content: Text('无法打开文件夹: $e'),
+          ),
         );
       }
     }
@@ -542,7 +551,10 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
       if (mounted) {
         setState(() => _loadingFiles = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('导航失败: $e')),
+          SnackBar(
+            duration: const Duration(milliseconds: 500),
+            content: Text('导航失败: $e'),
+          ),
         );
       }
     }
