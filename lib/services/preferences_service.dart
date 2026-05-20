@@ -57,11 +57,13 @@ class PreferencesService {
   static const String keyWebdavUsername = 'webdav_username';
   static const String keyWebdavPassword = 'webdav_password';
   static const String keyWebdavRemember = 'webdav_remember';
+  static const String keyWebdavRecent = 'webdav_recent';
 
   static String get webdavUrl => prefs.getString(keyWebdavUrl) ?? '';
   static String get webdavUsername => prefs.getString(keyWebdavUsername) ?? '';
   static String get webdavPassword => prefs.getString(keyWebdavPassword) ?? '';
   static bool get webdavRemember => prefs.getBool(keyWebdavRemember) ?? true;
+  static List<String> get webdavRecent => prefs.getStringList(keyWebdavRecent) ?? [];
 
   static Future<void> setWebdavCredentials({
     required String url,
@@ -81,10 +83,15 @@ class PreferencesService {
     await prefs.setBool(keyWebdavRemember, remember);
   }
 
+  static Future<void> setWebdavRecent(List<String> recent) =>
+      prefs.setStringList(keyWebdavRecent, recent);
+
   static Future<void> clearWebdavCredentials() async {
     await prefs.remove(keyWebdavUrl);
     await prefs.remove(keyWebdavUsername);
     await prefs.remove(keyWebdavPassword);
     await prefs.remove(keyWebdavRemember);
   }
+
+  static Future<void> clearWebdavRecent() => prefs.remove(keyWebdavRecent);
 }

@@ -32,6 +32,7 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
   bool _connecting = false;
   String? _error;
   bool _rememberPassword = true;
+  final List<String> _recentWebdavUrls = [];
 
   // 动画控制器
   late AnimationController _fileListAnimController;
@@ -107,11 +108,26 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
     _loadSavedWebdavInfo();
   }
 
+  String _normalizeWebdavUrl(String input) {
+    var url = input.trim();
+    if (url.isEmpty) return url;
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = 'http://$url';
+    }
+    while (url.endsWith('/')) {
+      url = url.substring(0, url.length - 1);
+    }
+    return url;
+  }
+
   Future<void> _loadSavedWebdavInfo() async {
     final savedUrl = PreferencesService.webdavUrl;
     final savedUser = PreferencesService.webdavUsername;
     final savedPass = PreferencesService.webdavPassword;
     final savedRemember = PreferencesService.webdavRemember;
+    _recentWebdavUrls
+      ..clear()
+      ..addAll(PreferencesService.webdavRecent);
     if (savedUrl.isNotEmpty) {
       _webdavUrl.text = savedUrl;
       _webdavUser.text = savedUser;
@@ -122,16 +138,31 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
   }
 
   Future<void> _saveWebdavInfo() async {
+    final normalizedUrl = _normalizeWebdavUrl(_webdavUrl.text);
     await PreferencesService.setWebdavCredentials(
-      url: _webdavUrl.text.trim(),
+      url: normalizedUrl,
       username: _webdavUser.text.trim(),
       password: _webdavPass.text,
       remember: _rememberPassword,
     );
+    await _storeRecentWebdavUrl(normalizedUrl);
+  }
+
+  Future<void> _storeRecentWebdavUrl(String url) async {
+    if (url.isEmpty) return;
+    _recentWebdavUrls.remove(url);
+    _recentWebdavUrls.insert(0, url);
+    if (_recentWebdavUrls.length > 5) {
+      _recentWebdavUrls.removeRange(5, _recentWebdavUrls.length);
+    }
+    await PreferencesService.setWebdavRecent(_recentWebdavUrls);
+    if (mounted) setState(() {});
   }
 
   Future<void> _clearSavedWebdavInfo() async {
     await PreferencesService.clearWebdavCredentials();
+    await PreferencesService.clearWebdavRecent();
+    _recentWebdavUrls.clear();
     _webdavUrl.clear();
     _webdavUser.clear();
     _webdavPass.clear();
@@ -171,15 +202,11 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
 
     try {
       debugPrint('[WebDAV] 开始连接: ${_webdavUrl.text}');
-      var url = _webdavUrl.text.trim();
+      final url = _normalizeWebdavUrl(_webdavUrl.text);
       final user = _webdavUser.text.trim();
       final pass = _webdavPass.text;
 
       if (url.isEmpty) throw Exception('请输入服务器地址');
-      if (!url.startsWith('http://') && !url.startsWith('https://')) {
-        url = 'http://$url';
-      }
-      if (url.endsWith('/')) url = url.substring(0, url.length - 1);
 
       final uri = Uri.tryParse(url);
       if (uri == null || uri.host.isEmpty) {
@@ -207,6 +234,14 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
           _connecting = false;
           _connected = true;
         });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('WebDAV 已连接', style: GoogleFonts.inter(color: Colors.white)),
+            backgroundColor: Colors.green.withValues(alpha: 0.85),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
       }
     } catch (e) {
       debugPrint('[WebDAV] 连接失败: $e');
@@ -224,6 +259,10 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
           msg.contains('401') ||
           msg.contains('403')) {
         errorMsg = '用户名或密码错误，请重新输入';
+      } else if (msg.contains('405')) {
+        errorMsg = '服务器不支持 WebDAV PROPFIND，请检查目录路径或服务配置';
+      } else if (msg.contains('404')) {
+        errorMsg = '服务器路径不存在，请检查根目录或 WebDAV 挂载路径';
       } else if (msg.contains('Connection refused') ||
           msg.contains('拒绝')) {
         errorMsg = '服务器拒绝连接，请检查端口或服务是否启动';
@@ -673,7 +712,56 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
               ),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 12),
+
+          if (_recentWebdavUrls.isNotEmpty) ...[
+            Text(
+              '最近连接',
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: theme.textSecondary.withValues(alpha: 0.55),
+                letterSpacing: 1.0,
+              ),
+            ),
+            const SizedBox(height: 8),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: _recentWebdavUrls.map((url) {
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: GestureDetector(
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        setState(() {
+                          _webdavUrl.text = url;
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: theme.primaryColor.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: theme.primaryColor.withValues(alpha: 0.12),
+                          ),
+                        ),
+                        child: Text(
+                          url,
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            color: theme.textColor,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+            const SizedBox(height: 18),
+          ],
 
           // 连接按钮
           ScaleOnTap(
