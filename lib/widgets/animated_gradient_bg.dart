@@ -2,7 +2,6 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
-import '../models/app_theme.dart';
 import '../providers/theme_provider.dart';
 
 /// 动画渐变背景 — 支持 Aurora 主题特殊正弦动画
@@ -65,17 +64,15 @@ class _AnimatedGradientBgState extends State<AnimatedGradientBg>
                         Color.lerp(
                             colors[2],
                             colors.length > 3 ? colors[3] : colors[0],
-                            0.5 +
-                                0.5 *
-                                    sin(_ctrl.value * 2 * pi + 1.0))!,
+                            0.5 + 0.5 * sin(_ctrl.value * 2 * pi + 1.0))!,
                         Color.lerp(colors[0], colors[1],
                             0.3 + 0.3 * cos(_ctrl.value * 2 * pi + 2.0))!,
                       ]
                     : [
                         Color.lerp(colors[0], colors[1], _ctrl.value * 0.3)!,
                         colors.length > 2
-                            ? Color.lerp(colors[1], colors[2],
-                                _ctrl.value * 0.2)!
+                            ? Color.lerp(
+                                colors[1], colors[2], _ctrl.value * 0.2)!
                             : colors[1],
                         Color.lerp(
                             colors[0],

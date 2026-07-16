@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import 'models/app_theme.dart';
 import 'pages/home_page.dart';
 import 'pages/reader_page.dart';
 import 'pages/network_storage_page.dart';
@@ -119,105 +118,98 @@ class GlassMdApp extends StatelessWidget {
               final theme = tp.currentTheme;
               return MaterialApp(
                 key: const ValueKey('amber_md_app'),
-                  title: 'Amber MD',
-                  debugShowCheckedModeBanner: false,
-                  localizationsDelegates: const [
-                    GlobalMaterialLocalizations.delegate,
-                    GlobalWidgetsLocalizations.delegate,
-                    GlobalCupertinoLocalizations.delegate,
-                  ],
-                  supportedLocales: const [
-                    Locale('zh', 'CN'),
-                    Locale('en', 'US'),
-                  ],
-                  locale: const Locale('zh', 'CN'),
-                  theme: ThemeData(
-                    brightness: theme.brightness,
-                    colorScheme: theme.brightness == Brightness.dark
-                        ? ColorScheme.dark(
-                            primary: theme.primaryColor,
-                            secondary: theme.accentColor,
-                            surface: theme.surfaceColor,
-                            onSurface: theme.textColor,
-                          )
-                        : ColorScheme.light(
-                            primary: theme.primaryColor,
-                            secondary: theme.accentColor,
-                            surface: theme.surfaceColor,
-                            onSurface: theme.textColor,
-                          ),
-                    scaffoldBackgroundColor: theme.bgGradientColors[0],
-                    useMaterial3: true,
-                    textSelectionTheme: TextSelectionThemeData(
-                      selectionColor:
-                          theme.primaryColor.withValues(alpha: 0.3),
-                      cursorColor: theme.primaryColor,
-                      selectionHandleColor: theme.primaryColor,
-                    ),
-                    textTheme: theme.brightness == Brightness.dark
-                        ? GoogleFonts.interTextTheme(
-                            ThemeData.dark().textTheme)
-                        : GoogleFonts.interTextTheme(
-                            ThemeData.light().textTheme),
+                title: 'Amber MD',
+                debugShowCheckedModeBanner: false,
+                localizationsDelegates: const [
+                  GlobalMaterialLocalizations.delegate,
+                  GlobalWidgetsLocalizations.delegate,
+                  GlobalCupertinoLocalizations.delegate,
+                ],
+                supportedLocales: const [
+                  Locale('zh', 'CN'),
+                  Locale('en', 'US'),
+                ],
+                locale: const Locale('zh', 'CN'),
+                theme: ThemeData(
+                  brightness: theme.brightness,
+                  colorScheme: theme.brightness == Brightness.dark
+                      ? ColorScheme.dark(
+                          primary: theme.primaryColor,
+                          secondary: theme.accentColor,
+                          surface: theme.surfaceColor,
+                          onSurface: theme.textColor,
+                        )
+                      : ColorScheme.light(
+                          primary: theme.primaryColor,
+                          secondary: theme.accentColor,
+                          surface: theme.surfaceColor,
+                          onSurface: theme.textColor,
+                        ),
+                  scaffoldBackgroundColor: theme.bgGradientColors[0],
+                  useMaterial3: true,
+                  textSelectionTheme: TextSelectionThemeData(
+                    selectionColor: theme.primaryColor.withValues(alpha: 0.3),
+                    cursorColor: theme.primaryColor,
+                    selectionHandleColor: theme.primaryColor,
                   ),
-                  home: const HomePage(),
-                  onGenerateRoute: (settings) {
-                    Route<dynamic> _buildPageTransition(Widget page) {
-                      return PageRouteBuilder<dynamic>(
-                        settings: settings,
-                        transitionDuration: const Duration(milliseconds: 300),
-                        reverseTransitionDuration:
-                            const Duration(milliseconds: 250),
-                        pageBuilder: (context, anim, secondary) {
-                          return FadeTransition(
-                            opacity: CurvedAnimation(
-                                parent: anim,
-                                curve: Curves.easeOutCubic),
-                            child: SlideTransition(
-                              position: Tween<Offset>(
-                                begin: const Offset(0, 0.04),
-                                end: Offset.zero,
-                              ).animate(anim),
-                              child: page,
-                            ),
-                          );
-                        },
-                      );
-                    }
+                  textTheme: theme.brightness == Brightness.dark
+                      ? GoogleFonts.interTextTheme(ThemeData.dark().textTheme)
+                      : GoogleFonts.interTextTheme(ThemeData.light().textTheme),
+                ),
+                home: const HomePage(),
+                onGenerateRoute: (settings) {
+                  Route<dynamic> _buildPageTransition(Widget page) {
+                    return PageRouteBuilder<dynamic>(
+                      settings: settings,
+                      transitionDuration: const Duration(milliseconds: 300),
+                      reverseTransitionDuration:
+                          const Duration(milliseconds: 250),
+                      pageBuilder: (context, anim, secondary) {
+                        return FadeTransition(
+                          opacity: CurvedAnimation(
+                              parent: anim, curve: Curves.easeOutCubic),
+                          child: SlideTransition(
+                            position: Tween<Offset>(
+                              begin: const Offset(0, 0.04),
+                              end: Offset.zero,
+                            ).animate(anim),
+                            child: page,
+                          ),
+                        );
+                      },
+                    );
+                  }
 
-                    if (settings.name == '/reader') {
-                      final args = settings.arguments;
-                      if (args is! Map<String, dynamic>) {
-                        return _buildPageTransition(const Scaffold(
-                            body: Center(
-                                child: Text('无效的参数'))));
-                      }
+                  if (settings.name == '/reader') {
+                    final args = settings.arguments;
+                    if (args is! Map<String, dynamic>) {
                       return _buildPageTransition(
-                        ReaderPage(
-                          filePath: args['path'] as String? ?? '',
-                          fileType: args['fileType'] as String? ?? 'md',
-                        ),
-                      );
+                          const Scaffold(body: Center(child: Text('无效的参数'))));
                     }
-                    if (settings.name == '/network_storage') {
-                      final args = settings.arguments;
-                      if (args is! Map<String, dynamic>) {
-                        return _buildPageTransition(const Scaffold(
-                            body: Center(
-                                child: Text('无效的参数'))));
-                      }
+                    return _buildPageTransition(
+                      ReaderPage(
+                        filePath: args['path'] as String? ?? '',
+                        fileType: args['fileType'] as String? ?? 'md',
+                      ),
+                    );
+                  }
+                  if (settings.name == '/network_storage') {
+                    final args = settings.arguments;
+                    if (args is! Map<String, dynamic>) {
                       return _buildPageTransition(
-                        NetworkStoragePage(
-                          storageType:
-                              args['type'] as String? ?? 'webdav',
-                        ),
-                      );
+                          const Scaffold(body: Center(child: Text('无效的参数'))));
                     }
-                    if (settings.name == '/settings') {
-                      return _buildPageTransition(const SettingsPage());
-                    }
-                    return null;
-                  },
+                    return _buildPageTransition(
+                      NetworkStoragePage(
+                        storageType: args['type'] as String? ?? 'webdav',
+                      ),
+                    );
+                  }
+                  if (settings.name == '/settings') {
+                    return _buildPageTransition(const SettingsPage());
+                  }
+                  return null;
+                },
               );
             },
           );

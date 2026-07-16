@@ -53,6 +53,51 @@ class PreferencesService {
   static Future<void> setRecentFiles(List<String> files) =>
       prefs.setStringList(keyRecentFiles, files);
 
+  // ─── 阅读进度 ─────────────────────────────────────────────────
+
+  static const String keyReadingProgress = 'reading_progress_v1';
+
+  static Map<String, double> get readingProgressMap {
+    final raw = prefs.getString(keyReadingProgress);
+    if (raw == null || raw.isEmpty) return {};
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) {
+        return decoded.map(
+          (key, value) {
+            final progress = value is num
+                ? value.toDouble()
+                : double.tryParse(value.toString()) ?? 0;
+            return MapEntry(
+              key.toString(),
+              progress.clamp(0.0, 1.0).toDouble(),
+            );
+          },
+        );
+      }
+    } catch (_) {}
+    return {};
+  }
+
+  static double getReadingProgress(String path) =>
+      readingProgressMap[path] ?? 0;
+
+  static Future<void> setReadingProgress(String path, double progress) async {
+    if (path.isEmpty) return;
+    final map = readingProgressMap;
+    map[path] = progress.clamp(0.0, 1.0).toDouble();
+    await prefs.setString(keyReadingProgress, jsonEncode(map));
+  }
+
+  static Future<void> clearReadingProgress(String path) async {
+    final map = readingProgressMap..remove(path);
+    if (map.isEmpty) {
+      await prefs.remove(keyReadingProgress);
+    } else {
+      await prefs.setString(keyReadingProgress, jsonEncode(map));
+    }
+  }
+
   // ─── WebDAV 凭据 ──────────────────────────────────────────────
 
   static const String keyWebdavUrl = 'webdav_url';
@@ -61,12 +106,16 @@ class PreferencesService {
   static const String keyWebdavRemember = 'webdav_remember';
   static const String keyWebdavRecent = 'webdav_recent';
   static const String keyWebdavLastPaths = 'webdav_last_paths';
+  static const String keyWebdavAllowSelfSigned = 'webdav_allow_self_signed';
 
   static String get webdavUrl => prefs.getString(keyWebdavUrl) ?? '';
   static String get webdavUsername => prefs.getString(keyWebdavUsername) ?? '';
   static String get webdavPassword => prefs.getString(keyWebdavPassword) ?? '';
   static bool get webdavRemember => prefs.getBool(keyWebdavRemember) ?? true;
-  static List<String> get webdavRecent => prefs.getStringList(keyWebdavRecent) ?? [];
+  static bool get webdavAllowSelfSigned =>
+      prefs.getBool(keyWebdavAllowSelfSigned) ?? false;
+  static List<String> get webdavRecent =>
+      prefs.getStringList(keyWebdavRecent) ?? [];
 
   static Future<void> setWebdavCredentials({
     required String url,
@@ -132,5 +181,9 @@ class PreferencesService {
     }
   }
 
-  static Future<void> clearWebdavLastPaths() => prefs.remove(keyWebdavLastPaths);
+  static Future<void> clearWebdavLastPaths() =>
+      prefs.remove(keyWebdavLastPaths);
+
+  static Future<void> setWebdavAllowSelfSigned(bool value) =>
+      prefs.setBool(keyWebdavAllowSelfSigned, value);
 }

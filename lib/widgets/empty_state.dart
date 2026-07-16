@@ -48,7 +48,7 @@ class _EmptyStateState extends State<EmptyState>
               // 光晕透明度：跟随缩放同步，图标最大时光最亮
               final glowAlpha = 0.10 + _ctrl.value * 0.20;
               final iconAlpha = 0.50 + _ctrl.value * 0.15;
-              
+
               return Transform.scale(
                 scale: scale,
                 child: Container(
