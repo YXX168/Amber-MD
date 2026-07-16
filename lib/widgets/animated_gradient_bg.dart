@@ -2,7 +2,6 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
-import '../models/app_theme.dart';
 import '../providers/theme_provider.dart';
 
 /// 动画渐变背景 — 支持 Aurora 主题特殊正弦动画

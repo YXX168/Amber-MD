@@ -213,7 +213,6 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
     _downloadOverlay?.remove();
 
     final overlay = Overlay.of(context, rootOverlay: true);
-    if (overlay == null) return;
 
     _downloadOverlay = OverlayEntry(
       builder: (context) {
@@ -869,7 +868,7 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
                 vertical: 4,
               ),
               value: _allowSelfSignedCertificates,
-              activeThumbColor: theme.primaryColor,
+              activeColor: theme.primaryColor,
               onChanged: (value) {
                 HapticFeedback.selectionClick();
                 setState(() => _allowSelfSignedCertificates = value);

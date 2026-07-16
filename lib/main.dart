@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import 'models/app_theme.dart';
 import 'pages/home_page.dart';
 import 'pages/reader_page.dart';
 import 'pages/network_storage_page.dart';

@@ -12,6 +12,7 @@ import 'package:path/path.dart' as p;
 import '../models/app_theme.dart';
 import '../pages/home_page.dart';
 import '../providers/theme_provider.dart';
+import '../services/preferences_service.dart';
 import '../widgets/animated_gradient_bg.dart';
 import '../widgets/glass_app_bar.dart';
 import '../widgets/glass_card.dart';
@@ -432,8 +433,6 @@ class _ReaderPageState extends State<ReaderPage> with TickerProviderStateMixin {
   Widget _buildContent({double topPadding = 72}) {
     final tp = ThemeProvider.of(context);
     final theme = tp.currentTheme;
-    final isDark = theme.brightness == Brightness.dark;
-
     final topPad = MediaQuery.of(context).padding.top +
         topPadding +
         (_isSearching ? 56 : 0);
