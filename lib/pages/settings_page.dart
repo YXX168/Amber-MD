@@ -146,9 +146,7 @@ class SettingsPage extends StatelessWidget {
                     const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
                 animate: true,
                 animationDelay: Duration(milliseconds: mode.index * 60),
-                color: selected
-                    ? t.primaryColor.withValues(alpha: 0.15)
-                    : null,
+                color: selected ? t.primaryColor.withValues(alpha: 0.15) : null,
                 border: Border.all(
                   color: selected
                       ? t.primaryColor.withValues(alpha: 0.5)
@@ -230,10 +228,8 @@ class SettingsPage extends StatelessWidget {
                     fontSizeLabels[opt]!,
                     style: GoogleFonts.inter(
                       fontSize: fontSizeMap[opt]! - 2,
-                      fontWeight:
-                          selected ? FontWeight.w700 : FontWeight.w500,
-                      color:
-                          selected ? theme.primaryColor : theme.textColor,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                      color: selected ? theme.primaryColor : theme.textColor,
                     ),
                   ),
                 ),
@@ -278,10 +274,8 @@ class SettingsPage extends StatelessWidget {
                     label,
                     style: GoogleFonts.inter(
                       fontSize: sp == 0.0 ? 12 : 13,
-                      fontWeight:
-                          selected ? FontWeight.w700 : FontWeight.w500,
-                      color:
-                          selected ? theme.primaryColor : theme.textColor,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                      color: selected ? theme.primaryColor : theme.textColor,
                     ),
                   ),
                 ),
@@ -325,10 +319,8 @@ class SettingsPage extends StatelessWidget {
                     h.toString(),
                     style: GoogleFonts.inter(
                       fontSize: 14,
-                      fontWeight:
-                          selected ? FontWeight.w700 : FontWeight.w500,
-                      color:
-                          selected ? theme.primaryColor : theme.textColor,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                      color: selected ? theme.primaryColor : theme.textColor,
                     ),
                   ),
                 ),

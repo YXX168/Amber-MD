@@ -48,14 +48,12 @@ class _GlassIconButtonState extends State<GlassIconButton>
 
   void _onTapDown(TapDownDetails details) {
     _scaleController.animateTo(0.88,
-        duration: const Duration(milliseconds: 80),
-        curve: Curves.easeOutCubic);
+        duration: const Duration(milliseconds: 80), curve: Curves.easeOutCubic);
   }
 
   void _onTapUp(TapUpDetails details) {
     _scaleController.animateTo(1.0,
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.elasticOut);
+        duration: const Duration(milliseconds: 200), curve: Curves.elasticOut);
     widget.onTap();
   }
 
@@ -89,7 +87,8 @@ class _GlassIconButtonState extends State<GlassIconButton>
             child: SizedBox(
               width: btnSize,
               height: btnSize,
-              child: Icon(widget.icon, color: theme.textSecondary, size: iconSize),
+              child:
+                  Icon(widget.icon, color: theme.textSecondary, size: iconSize),
             ),
           ),
         ),

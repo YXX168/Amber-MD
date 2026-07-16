@@ -34,6 +34,7 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
   bool _connecting = false;
   String? _error;
   bool _rememberPassword = true;
+  bool _allowSelfSignedCertificates = false;
   final List<String> _recentWebdavUrls = [];
 
   // 动画控制器
@@ -58,7 +59,7 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
 
   // 列表项滑动过渡 key
   int _listKey = 0;
-  
+
   // 正在加载文件列表
   bool _loadingFiles = false;
 
@@ -98,8 +99,8 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
       TweenSequenceItem(
           tween: Tween<Offset>(begin: const Offset(0.05, 0), end: Offset.zero),
           weight: 2),
-    ]).animate(CurvedAnimation(
-        parent: _errorAnimController, curve: Curves.easeInOut));
+    ]).animate(
+        CurvedAnimation(parent: _errorAnimController, curve: Curves.easeInOut));
 
     // 导航过渡动画（目录切换时路径栏淡入淡出）
     _navAnimController = AnimationController(
@@ -114,23 +115,12 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
     _loadSavedWebdavInfo();
   }
 
-  String _normalizeWebdavUrl(String input) {
-    var url = input.trim();
-    if (url.isEmpty) return url;
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      url = 'http://$url';
-    }
-    while (url.endsWith('/')) {
-      url = url.substring(0, url.length - 1);
-    }
-    return url;
-  }
-
   Future<void> _loadSavedWebdavInfo() async {
     final savedUrl = PreferencesService.webdavUrl;
     final savedUser = PreferencesService.webdavUsername;
     final savedPass = PreferencesService.webdavPassword;
     final savedRemember = PreferencesService.webdavRemember;
+    final allowSelfSigned = PreferencesService.webdavAllowSelfSigned;
     _recentWebdavUrls
       ..clear()
       ..addAll(PreferencesService.webdavRecent);
@@ -139,23 +129,30 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
       _webdavUser.text = savedUser;
       _webdavPass.text = savedPass;
       _rememberPassword = savedRemember;
+      _allowSelfSignedCertificates = allowSelfSigned;
+      if (mounted) setState(() {});
+    } else {
+      _allowSelfSignedCertificates = allowSelfSigned;
       if (mounted) setState(() {});
     }
   }
 
   Future<void> _saveWebdavInfo() async {
-    final normalizedUrl = _normalizeWebdavUrl(_webdavUrl.text);
+    final normalizedUrl = normalizeWebDavUrl(_webdavUrl.text);
     await PreferencesService.setWebdavCredentials(
       url: normalizedUrl,
       username: _webdavUser.text.trim(),
       password: _webdavPass.text,
       remember: _rememberPassword,
     );
+    await PreferencesService.setWebdavAllowSelfSigned(
+      _allowSelfSignedCertificates,
+    );
     await _storeRecentWebdavUrl(normalizedUrl);
   }
 
   Future<void> _saveLastPathForCurrentConnection() async {
-    final url = _normalizeWebdavUrl(_webdavUrl.text);
+    final url = normalizeWebDavUrl(_webdavUrl.text);
     if (url.isEmpty) return;
     await PreferencesService.setWebdavLastPath(url, _currentPath);
   }
@@ -180,20 +177,22 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
     _webdavUser.clear();
     _webdavPass.clear();
     _rememberPassword = true;
+    _allowSelfSignedCertificates = false;
+    await PreferencesService.setWebdavAllowSelfSigned(false);
+    if (!mounted) return;
     setState(() {});
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          duration: const Duration(milliseconds: 500),
-          content: Text('已清除保存的连接信息',
-              style: GoogleFonts.inter(color: Colors.white)),
-          backgroundColor: Colors.redAccent.withValues(alpha: 0.8),
-          behavior: SnackBarBehavior.floating,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        duration: const Duration(milliseconds: 500),
+        content: Text(
+          '已清除保存的连接信息',
+          style: GoogleFonts.inter(color: Colors.white),
         ),
-      );
-    }
+        backgroundColor: Colors.redAccent.withValues(alpha: 0.8),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
   }
 
   @override
@@ -232,7 +231,8 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 360),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 12),
                     decoration: BoxDecoration(
                       color: theme.surfaceColor.withValues(alpha: 0.92),
                       borderRadius: BorderRadius.circular(18),
@@ -284,7 +284,8 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
                                 overflow: TextOverflow.ellipsis,
                                 style: GoogleFonts.inter(
                                   fontSize: 11,
-                                  color: theme.textSecondary.withValues(alpha: 0.72),
+                                  color: theme.textSecondary
+                                      .withValues(alpha: 0.72),
                                 ),
                               ),
                             ],
@@ -302,7 +303,8 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
     );
 
     overlay.insert(_downloadOverlay!);
-    _downloadOverlayTimer = Timer(const Duration(seconds: 20), _hideDownloadOverlay);
+    _downloadOverlayTimer =
+        Timer(const Duration(seconds: 20), _hideDownloadOverlay);
   }
 
   void _hideDownloadOverlay() {
@@ -320,7 +322,7 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
     _errorAnimController.reset();
 
     try {
-      final url = _normalizeWebdavUrl(_webdavUrl.text);
+      final url = normalizeWebDavUrl(_webdavUrl.text);
       final user = _webdavUser.text.trim();
       final pass = _webdavPass.text;
       if (url.isEmpty) throw Exception('请输入服务器地址');
@@ -329,16 +331,19 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
         baseUrl: url,
         username: user,
         password: pass,
+        allowSelfSignedCertificates: _allowSelfSignedCertificates,
       );
       await service.propfind('/');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           duration: const Duration(milliseconds: 500),
-          content: Text('连接测试成功', style: GoogleFonts.inter(color: Colors.white)),
+          content:
+              Text('连接测试成功', style: GoogleFonts.inter(color: Colors.white)),
           backgroundColor: Colors.green.withValues(alpha: 0.85),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       );
     } catch (e) {
@@ -369,7 +374,7 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
 
     try {
       debugPrint('[WebDAV] 开始连接: ${_webdavUrl.text}');
-      final url = _normalizeWebdavUrl(_webdavUrl.text);
+      final url = normalizeWebDavUrl(_webdavUrl.text);
       final user = _webdavUser.text.trim();
       final pass = _webdavPass.text;
 
@@ -384,6 +389,7 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
         baseUrl: url,
         username: user,
         password: pass,
+        allowSelfSignedCertificates: _allowSelfSignedCertificates,
       );
 
       final startPath = PreferencesService.getWebdavLastPath(url) ?? '/';
@@ -406,10 +412,12 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             duration: const Duration(milliseconds: 500),
-            content: Text('WebDAV 已连接', style: GoogleFonts.inter(color: Colors.white)),
+            content: Text('WebDAV 已连接',
+                style: GoogleFonts.inter(color: Colors.white)),
             backgroundColor: Colors.green.withValues(alpha: 0.85),
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
         );
       }
@@ -433,8 +441,7 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
         errorMsg = '服务器不支持 WebDAV PROPFIND，请检查目录路径或服务配置';
       } else if (msg.contains('404')) {
         errorMsg = '服务器路径不存在，请检查根目录或 WebDAV 挂载路径';
-      } else if (msg.contains('Connection refused') ||
-          msg.contains('拒绝')) {
+      } else if (msg.contains('Connection refused') || msg.contains('拒绝')) {
         errorMsg = '服务器拒绝连接，请检查端口或服务是否启动';
       } else {
         errorMsg = msg;
@@ -501,10 +508,12 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
         _hideDownloadOverlay();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('下载失败: $e', style: GoogleFonts.inter(color: Colors.white)),
+            content:
+                Text('下载失败: $e', style: GoogleFonts.inter(color: Colors.white)),
             backgroundColor: const Color(0xFFE57373).withValues(alpha: 0.88),
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             margin: const EdgeInsets.fromLTRB(20, 0, 20, 20),
             duration: const Duration(seconds: 3),
           ),
@@ -532,10 +541,10 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
   /// 导航到指定路径（内部用，带列表动画）
   Future<void> _navigateToPath(String path) async {
     if (_webdavService == null) return;
-    
+
     // 先显示加载状态
     setState(() => _loadingFiles = true);
-    
+
     try {
       final list = await _webdavService!.propfind(path);
       if (mounted) {
@@ -562,6 +571,7 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
 
   Future<void> _disconnect() async {
     await _saveLastPathForCurrentConnection();
+    if (!mounted) return;
     setState(() {
       _connected = false;
       _files.clear();
@@ -716,8 +726,7 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             child: TextField(
               controller: _webdavUrl,
-              style: GoogleFonts.inter(
-                  fontSize: 14, color: theme.textColor),
+              style: GoogleFonts.inter(fontSize: 14, color: theme.textColor),
               decoration: InputDecoration(
                 hintText: '例如: https://dav.example.com',
                 hintStyle: GoogleFonts.inter(
@@ -752,8 +761,7 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             child: TextField(
               controller: _webdavUser,
-              style: GoogleFonts.inter(
-                  fontSize: 14, color: theme.textColor),
+              style: GoogleFonts.inter(fontSize: 14, color: theme.textColor),
               decoration: InputDecoration(
                 hintText: '输入用户名',
                 hintStyle: GoogleFonts.inter(
@@ -788,8 +796,7 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
             child: TextField(
               controller: _webdavPass,
               obscureText: true,
-              style: GoogleFonts.inter(
-                  fontSize: 14, color: theme.textColor),
+              style: GoogleFonts.inter(fontSize: 14, color: theme.textColor),
               decoration: InputDecoration(
                 hintText: '输入密码',
                 hintStyle: GoogleFonts.inter(
@@ -811,8 +818,8 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
           Row(
             children: [
               GestureDetector(
-                onTap: () => setState(
-                    () => _rememberPassword = !_rememberPassword),
+                onTap: () =>
+                    setState(() => _rememberPassword = !_rememberPassword),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -853,6 +860,49 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
           ),
           const SizedBox(height: 12),
 
+          GlassCard(
+            borderRadius: 14,
+            padding: EdgeInsets.zero,
+            child: SwitchListTile.adaptive(
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 4,
+              ),
+              value: _allowSelfSignedCertificates,
+              activeThumbColor: theme.primaryColor,
+              onChanged: (value) {
+                HapticFeedback.selectionClick();
+                setState(() => _allowSelfSignedCertificates = value);
+              },
+              secondary: Icon(
+                Icons.verified_user_outlined,
+                color: _allowSelfSignedCertificates
+                    ? Colors.orangeAccent
+                    : theme.primaryColor,
+              ),
+              title: Text(
+                '允许自签名证书',
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: theme.textColor,
+                ),
+              ),
+              subtitle: Text(
+                _allowSelfSignedCertificates
+                    ? '仅用于可信的家庭 NAS；公共网络请关闭'
+                    : '默认严格验证 HTTPS 证书',
+                style: GoogleFonts.inter(
+                  fontSize: 10.5,
+                  color: _allowSelfSignedCertificates
+                      ? Colors.orangeAccent.withValues(alpha: 0.85)
+                      : theme.textSecondary.withValues(alpha: 0.55),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
           if (_recentWebdavUrls.isNotEmpty) ...[
             Text(
               '最近连接',
@@ -875,14 +925,16 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
                         HapticFeedback.selectionClick();
                         setState(() {
                           _webdavUrl.text = url;
-                          final savedPath = PreferencesService.getWebdavLastPath(url);
+                          final savedPath =
+                              PreferencesService.getWebdavLastPath(url);
                           if (savedPath != null) {
                             debugPrint('[WebDAV] 已恢复上次路径: $savedPath');
                           }
                         });
                       },
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
                           color: theme.primaryColor.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(999),
@@ -987,8 +1039,8 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
                 borderRadius: 12,
                 padding: const EdgeInsets.all(14),
                 color: Colors.redAccent.withValues(alpha: 0.1),
-                border: Border.all(
-                    color: Colors.redAccent.withValues(alpha: 0.2)),
+                border:
+                    Border.all(color: Colors.redAccent.withValues(alpha: 0.2)),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -1030,15 +1082,14 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: GlassCard(
               borderRadius: 12,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
               child: Row(
                 children: [
                   // 返回上级按钮
                   if (_pathHistory.isNotEmpty)
                     ScaleOnTap(
                       onTap: () {
-                        HapticFeedback.mediumImpact();  // 返回按钮震动反馈
+                        HapticFeedback.mediumImpact(); // 返回按钮震动反馈
                         _goBack();
                       },
                       child: Padding(
@@ -1047,8 +1098,7 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
                             color: theme.primaryColor, size: 18),
                       ),
                     ),
-                  if (_pathHistory.isNotEmpty)
-                    const SizedBox(width: 4),
+                  if (_pathHistory.isNotEmpty) const SizedBox(width: 4),
                   // 面包屑
                   Expanded(
                     child: SingleChildScrollView(
@@ -1077,8 +1127,7 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
                     child: Padding(
                       padding: const EdgeInsets.all(4),
                       child: Icon(Icons.refresh_rounded,
-                          color: theme.textSecondary
-                              .withValues(alpha: 0.5),
+                          color: theme.textSecondary.withValues(alpha: 0.5),
                           size: 18),
                     ),
                   ),
@@ -1091,7 +1140,7 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
         // 文件列表（骨架占位 + 逐项延迟入场）
         Expanded(
           child: _loadingFiles
-              ? _buildFilesSkeleton(theme)  // 加载时显示骨架占位
+              ? _buildFilesSkeleton(theme) // 加载时显示骨架占位
               : _files.isEmpty
                   ? FadeTransition(
                       opacity: _fileListAnim,
@@ -1136,10 +1185,12 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
                             curve: Curves.easeOutCubic,
                             builder: (context, value, child) {
                               return FadeTransition(
-                                opacity: AlwaysStoppedAnimation(value.clamp(0.0, 1.0)),
+                                opacity: AlwaysStoppedAnimation(
+                                    value.clamp(0.0, 1.0)),
                                 child: SlideTransition(
                                   position: AlwaysStoppedAnimation(
-                                    Offset(0, 0.05 * (1 - value.clamp(0.0, 1.0))),
+                                    Offset(
+                                        0, 0.05 * (1 - value.clamp(0.0, 1.0))),
                                   ),
                                   child: child,
                                 ),
@@ -1219,8 +1270,7 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 2),
             child: Icon(Icons.chevron_right_rounded,
-                color: theme.textSecondary.withValues(alpha: 0.25),
-                size: 16),
+                color: theme.textSecondary.withValues(alpha: 0.25), size: 16),
           ),
         );
       }
@@ -1228,7 +1278,8 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
       items.add(
         _buildBreadcrumbItem(
           segments[i],
-          isLast && _currentPath.endsWith('/') &&
+          isLast &&
+              _currentPath.endsWith('/') &&
               _currentPath == '$accumulatedPath/',
           isLast && _currentPath == segmentPath
               ? null
@@ -1254,7 +1305,7 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
       onTap: isActive
           ? null
           : () {
-              HapticFeedback.lightImpact();  // 点击震动反馈
+              HapticFeedback.lightImpact(); // 点击震动反馈
               onTap?.call();
             },
       child: Padding(
@@ -1266,7 +1317,7 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
               Container(
                 height: 6,
                 width: 6,
-                margin: const EdgeInsets.only(right: 8),  // 圆点右边距，与文字间距
+                margin: const EdgeInsets.only(right: 8), // 圆点右边距，与文字间距
                 decoration: BoxDecoration(
                   color: theme.primaryColor,
                   shape: BoxShape.circle,
@@ -1289,7 +1340,7 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
       ),
     );
   }
-  
+
   /// 文件列表骨架占位 - 加载时显示，给用户视觉反馈
   Widget _buildFilesSkeleton(AppTheme theme) {
     return FadeTransition(
@@ -1297,16 +1348,18 @@ class _NetworkStoragePageState extends State<NetworkStoragePage>
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
         child: Column(
-          children: List.generate(5, (i) => Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Container(
-              height: 48,
-              decoration: BoxDecoration(
-                color: theme.textSecondary.withValues(alpha: 0.06),
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          )),
+          children: List.generate(
+              5,
+              (i) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Container(
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: theme.textSecondary.withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  )),
         ),
       ),
     );

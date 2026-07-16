@@ -9,6 +9,25 @@ import 'package:http/io_client.dart';
 
 import '../models/remote_file.dart';
 
+String normalizeWebDavUrl(String input) {
+  var value = input.trim();
+  if (value.isEmpty) return value;
+  if (!value.startsWith('http://') && !value.startsWith('https://')) {
+    final host = value.split('/').first.split(':').first.toLowerCase();
+    final isLocal = host == 'localhost' ||
+        host.endsWith('.local') ||
+        host.startsWith('127.') ||
+        host.startsWith('10.') ||
+        host.startsWith('192.168.') ||
+        RegExp(r'^172\.(1[6-9]|2\d|3[01])\.').hasMatch(host);
+    value = '${isLocal ? 'http' : 'https'}://$value';
+  }
+  while (value.endsWith('/')) {
+    value = value.substring(0, value.length - 1);
+  }
+  return value;
+}
+
 /// WebDAV 服务 — 使用 http 包 + IOClient 实现 PROPFIND 和 GET
 ///
 /// 修复：dart:io HttpClient 的 openUrl 对 PROPFIND 方法兼容性差（部分服务器返回 405）
@@ -17,26 +36,28 @@ class WebDavService {
   final String baseUrl;
   final String username;
   final String password;
+  final bool allowSelfSignedCertificates;
 
   WebDavService({
     required this.baseUrl,
     required this.username,
     required this.password,
+    this.allowSelfSignedCertificates = false,
   });
 
   /// 创建带 Basic Auth 的 IOClient
   http.Client get _client {
-    final credentials = base64Encode(utf8.encode('$username:$password'));
-    return IOClient(HttpClient()
+    final ioClient = HttpClient()
       ..addCredentials(
         // 对所有请求自动附加凭据
         Uri.parse(baseUrl),
         'Any Realm',
         HttpClientBasicCredentials(username, password),
-      )
-      ..badCertificateCallback =
-          (_, __, ___) => true // 允许自签名证书
-    );
+      );
+    if (allowSelfSignedCertificates) {
+      ioClient.badCertificateCallback = (_, __, ___) => true;
+    }
+    return IOClient(ioClient);
   }
 
   String get _authHeader {
@@ -55,8 +76,7 @@ class WebDavService {
     final portStr = base.hasPort && base.port != 80 && base.port != 443
         ? ':${base.port}'
         : '';
-    final urlStr =
-        '${base.scheme}://${base.host}$portStr$fullPath';
+    final urlStr = '${base.scheme}://${base.host}$portStr$fullPath';
     return Uri.parse(urlStr);
   }
 
@@ -158,23 +178,23 @@ class WebDavService {
       'Depth': '1',
       'Content-Type': 'application/xml; charset=utf-8',
       'Content-Length': bodyBytes.length.toString(),
-      'User-Agent': 'Amber-MD/6.0',
+      'User-Agent': 'Amber-MD/6.3',
     });
     request.bodyBytes = bodyBytes;
 
     final streamedResp = await client.send(request).timeout(
-          const Duration(seconds: 15),
-          onTimeout: () {
-            throw TimeoutException('PROPFIND 请求超时');
-          },
-        );
+      const Duration(seconds: 15),
+      onTimeout: () {
+        throw TimeoutException('PROPFIND 请求超时');
+      },
+    );
 
     final resp = await http.Response.fromStream(streamedResp).timeout(
-          const Duration(seconds: 15),
-          onTimeout: () {
-            throw TimeoutException('读取响应超时');
-          },
-        );
+      const Duration(seconds: 15),
+      onTimeout: () {
+        throw TimeoutException('读取响应超时');
+      },
+    );
 
     // 处理重定向
     if (resp.statusCode >= 300 &&
@@ -260,8 +280,7 @@ class WebDavService {
       } else {
         var href = rawHref;
         if (href.endsWith('/')) href = href.substring(0, href.length - 1);
-        final segments =
-            href.split('/').where((s) => s.isNotEmpty).toList();
+        final segments = href.split('/').where((s) => s.isNotEmpty).toList();
         name = segments.isNotEmpty ? segments.last : '';
       }
 
@@ -308,20 +327,19 @@ class WebDavService {
       request.headers.addAll({
         'Authorization': _authHeader,
         'Accept': '*/*',
-        'User-Agent': 'Amber-MD/6.0',
+        'User-Agent': 'Amber-MD/6.3',
       });
 
       final client = _client;
       try {
         final streamedResp = await client.send(request).timeout(
-              const Duration(seconds: 15),
-              onTimeout: () {
-                throw TimeoutException('GET 请求超时');
-              },
-            );
+          const Duration(seconds: 15),
+          onTimeout: () {
+            throw TimeoutException('GET 请求超时');
+          },
+        );
 
-        if (streamedResp.statusCode == 401 ||
-            streamedResp.statusCode == 403) {
+        if (streamedResp.statusCode == 401 || streamedResp.statusCode == 403) {
           throw Exception('认证失败: 用户名或密码错误');
         }
         if (streamedResp.statusCode >= 400) {

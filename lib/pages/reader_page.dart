@@ -44,6 +44,9 @@ class _ReaderPageState extends State<ReaderPage> with TickerProviderStateMixin {
   double _lastScrollOffset = 0;
   double _scrollDeltaAccum = 0;
   Timer? _searchDebounceTimer;
+  Timer? _progressSaveTimer;
+  double _readingProgress = 0;
+  bool _saving = false;
 
   // 编辑模式
   bool _isEditing = false;
@@ -58,6 +61,7 @@ class _ReaderPageState extends State<ReaderPage> with TickerProviderStateMixin {
 
   String get _fileType => widget.fileType;
   bool get _isMarkdown => _fileType == 'md';
+  bool get _hasUnsavedChanges => _isEditing && _editController.text != _content;
 
   @override
   void initState() {
@@ -72,7 +76,7 @@ class _ReaderPageState extends State<ReaderPage> with TickerProviderStateMixin {
       parent: _fadeController,
       curve: Curves.easeOutCubic,
     );
-    
+
     // 预加载延迟：先让骨架屏淡入，200ms后开始加载文件
     Future.delayed(const Duration(milliseconds: 200), () {
       if (mounted) _loadFile();
@@ -98,6 +102,23 @@ class _ReaderPageState extends State<ReaderPage> with TickerProviderStateMixin {
     if (showFab != _showBackToTop) {
       _showBackToTop = showFab;
       needsUpdate = true;
+    }
+
+    if (_scrollCtrl.hasClients) {
+      final maxScroll = _scrollCtrl.position.maxScrollExtent;
+      final progress =
+          maxScroll <= 0 ? 1.0 : (offset / maxScroll).clamp(0.0, 1.0);
+      if ((progress - _readingProgress).abs() >= 0.005) {
+        _readingProgress = progress;
+        needsUpdate = true;
+        _progressSaveTimer?.cancel();
+        _progressSaveTimer = Timer(const Duration(milliseconds: 450), () {
+          PreferencesService.setReadingProgress(
+            widget.filePath,
+            _readingProgress,
+          );
+        });
+      }
     }
 
     _backToTopHideTimer?.cancel();
@@ -134,6 +155,8 @@ class _ReaderPageState extends State<ReaderPage> with TickerProviderStateMixin {
   void dispose() {
     _backToTopHideTimer?.cancel();
     _searchDebounceTimer?.cancel();
+    _progressSaveTimer?.cancel();
+    PreferencesService.setReadingProgress(widget.filePath, _readingProgress);
     _scrollCtrl.dispose();
     _editController.dispose();
     _searchController.dispose();
@@ -156,12 +179,22 @@ class _ReaderPageState extends State<ReaderPage> with TickerProviderStateMixin {
       }
 
       if (mounted) {
+        final savedProgress =
+            PreferencesService.getReadingProgress(widget.filePath);
         // 先启动淡入动画，同时设置内容
         _fadeController.forward(from: 0);
         setState(() {
           _content = content;
+          _readingProgress = savedProgress;
           _loading = false;
         });
+        if (savedProgress > 0.01 && savedProgress < 0.98) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted || !_scrollCtrl.hasClients) return;
+            final target = _scrollCtrl.position.maxScrollExtent * savedProgress;
+            _scrollCtrl.jumpTo(target);
+          });
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -179,11 +212,35 @@ class _ReaderPageState extends State<ReaderPage> with TickerProviderStateMixin {
     setState(() => _isEditing = true);
   }
 
-  void _exitEditMode() {
-    setState(() => _isEditing = false);
+  Future<void> _exitEditMode() async {
+    if (_hasUnsavedChanges && !await _confirmDiscardChanges()) return;
+    if (mounted) setState(() => _isEditing = false);
+  }
+
+  Future<bool> _confirmDiscardChanges() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('放弃未保存的修改？'),
+        content: const Text('退出编辑后，本次修改将无法恢复。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('继续编辑'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('放弃修改'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
   }
 
   Future<void> _saveFile() async {
+    if (_saving) return;
+    setState(() => _saving = true);
     try {
       final file = File(widget.filePath);
       await file.writeAsString(_editController.text);
@@ -193,12 +250,13 @@ class _ReaderPageState extends State<ReaderPage> with TickerProviderStateMixin {
         setState(() {
           _content = _editController.text;
           _isEditing = false;
+          _saving = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             duration: const Duration(milliseconds: 500),
-            content: Text('文件已保存',
-                style: GoogleFonts.inter(color: Colors.white)),
+            content:
+                Text('文件已保存', style: GoogleFonts.inter(color: Colors.white)),
             backgroundColor: theme.primaryColor.withValues(alpha: 0.8),
             behavior: SnackBarBehavior.floating,
             shape:
@@ -208,11 +266,12 @@ class _ReaderPageState extends State<ReaderPage> with TickerProviderStateMixin {
       }
     } catch (e) {
       if (mounted) {
+        setState(() => _saving = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             duration: const Duration(milliseconds: 500),
-            content: Text('保存失败: $e',
-                style: GoogleFonts.inter(color: Colors.white)),
+            content:
+                Text('保存失败: $e', style: GoogleFonts.inter(color: Colors.white)),
             backgroundColor: Colors.redAccent.withValues(alpha: 0.8),
             behavior: SnackBarBehavior.floating,
             shape:
@@ -301,27 +360,35 @@ class _ReaderPageState extends State<ReaderPage> with TickerProviderStateMixin {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // 标题骨架
-            Container(
-              height: 28,
-              width: double.infinity * 0.6,
-              decoration: BoxDecoration(
-                color: theme.primaryColor.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(8),
+            FractionallySizedBox(
+              widthFactor: 0.6,
+              alignment: Alignment.centerLeft,
+              child: Container(
+                height: 28,
+                decoration: BoxDecoration(
+                  color: theme.primaryColor.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
             ),
             const SizedBox(height: 20),
             // 正文骨架行
-            ...List.generate(8, (i) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Container(
-                height: 16,
-                width: double.infinity * (0.4 + (i % 3) * 0.2),
-                decoration: BoxDecoration(
-                  color: theme.textSecondary.withValues(alpha: 0.06),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-            )),
+            ...List.generate(
+                8,
+                (i) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: FractionallySizedBox(
+                        widthFactor: 0.4 + (i % 3) * 0.2,
+                        alignment: Alignment.centerLeft,
+                        child: Container(
+                          height: 16,
+                          decoration: BoxDecoration(
+                            color: theme.textSecondary.withValues(alpha: 0.06),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                      ),
+                    )),
             const Spacer(),
             // 底部加载提示
             Center(
@@ -375,8 +442,8 @@ class _ReaderPageState extends State<ReaderPage> with TickerProviderStateMixin {
       // 非 Markdown：纯文本显示
       return SingleChildScrollView(
         controller: _scrollCtrl,
-        padding: EdgeInsets.fromLTRB(20, topPad, 20,
-            MediaQuery.of(context).padding.bottom + 32),
+        padding: EdgeInsets.fromLTRB(
+            20, topPad, 20, MediaQuery.of(context).padding.bottom + 32),
         child: SelectableText(
           _content,
           style: GoogleFonts.jetBrainsMono(
@@ -441,159 +508,168 @@ class _ReaderPageState extends State<ReaderPage> with TickerProviderStateMixin {
         final theme = tp.currentTheme;
         final isDark = theme.brightness == Brightness.dark;
 
-        return AnnotatedRegion<SystemUiOverlayStyle>(
-          value: isDark
-              ? const SystemUiOverlayStyle(
-                  statusBarColor: Colors.transparent,
-                  statusBarIconBrightness: Brightness.light,
-                )
-              : const SystemUiOverlayStyle(
-                  statusBarColor: Colors.transparent,
-                  statusBarIconBrightness: Brightness.dark,
-                ),
-          child: Scaffold(
-            extendBody: true,
-            extendBodyBehindAppBar: true,
-            body: AnimatedGradientBg(
-              child: _loading
-                  ? _buildLoadingIndicator(theme)
-                  : FadeTransition(
-                      opacity: _fadeAnimation,
-                      child: Stack(
-                      children: [
-                        // 内容
-                        SafeArea(
-                          top: false,
-                          bottom: false,
-                          child: _isEditing
-                              ? const SizedBox()
-                              : _buildContent(),
-                        ),
-
-                        // 编辑模式
-                        if (_isEditing)
-                          SafeArea(
-                            bottom: false,
-                            child: Padding(
-                              padding: EdgeInsets.fromLTRB(
-                                16,
-                                MediaQuery.of(context).padding.top + 72,
-                                16,
-                                MediaQuery.of(context).padding.bottom + 16,
-                              ),
-                              child: GlassCard(
-                                borderRadius: 16,
-                                padding: EdgeInsets.zero,
-                                color: isDark
-                                    ? const Color(0xFF0D0D1A)
-                                        .withValues(alpha: 0.85)
-                                    : Colors.white.withValues(alpha: 0.85),
-                                border: Border.all(
-                                  color: isDark
-                                      ? Colors.white.withValues(alpha: 0.08)
-                                      : theme.primaryColor
-                                          .withValues(alpha: 0.12),
-                                ),
-                                child: TextField(
-                                  controller: _editController,
-                                  maxLines: null,
-                                  expands: true,
-                                  textAlignVertical: TextAlignVertical.top,
-                                  style: GoogleFonts.jetBrainsMono(
-                                    fontSize: tp.fontSize,
-                                    color: theme.textSecondary,
-                                    height: tp.lineHeight,
-                                  ),
-                                  decoration: InputDecoration(
-                                    contentPadding: const EdgeInsets.all(16),
-                                    border: InputBorder.none,
-                                    hintText: '在此编辑内容...',
-                                    hintStyle: GoogleFonts.inter(
-                                      color: theme.textSecondary
-                                          .withValues(alpha: 0.3),
-                                    ),
-                                  ),
-                                  cursorColor: theme.primaryColor,
-                                ),
-                              ),
-                            ),
-                          ),
-
-                        // 顶部栏（平滑动画）
-                        AnimatedPositioned(
-                          duration: const Duration(milliseconds: 350),
-                          curve: Curves.easeOutQuint,
-                          top: _showAppBar
-                              ? 0
-                              : -(MediaQuery.of(context).padding.top + 72),
-                          left: 0,
-                          right: 0,
-                          child: SafeArea(
-                            bottom: false,
-                            child: Padding(
-                              padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-                              child: GlassAppBar(
-                                child: _isEditing
-                                    ? _buildEditAppBar()
-                                    : _isSearching
-                                        ? _buildSearchAppBar()
-                                        : _buildNormalAppBar(),
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        // 返回顶部 FAB
-                        Positioned(
-                          bottom: MediaQuery.of(context).padding.bottom + 24,
-                          right: 20,
-                          child: AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 400),
-                            switchInCurve: Curves.elasticOut,
-                            switchOutCurve: Curves.easeInBack,
-                            transitionBuilder: (child, anim) {
-                              return FadeTransition(
-                                opacity: anim,
-                                child: ScaleTransition(
-                                  scale: Tween<double>(begin: 0.3, end: 1.0)
-                                      .animate(CurvedAnimation(
-                                    parent: anim,
-                                    curve: Curves.elasticOut,
-                                  )),
-                                  child: child,
-                                ),
-                              );
-                            },
-                            child: _showBackToTop && !_isEditing
-                                ? GlassFAB(
-                                    key: const ValueKey('back_to_top'),
-                                    onTap: () {
-                                      _backToTopHideTimer?.cancel();
-                                      _scrollCtrl.animateTo(
-                                        0,
-                                        duration:
-                                            const Duration(milliseconds: 500),
-                                        curve: Curves.easeOut,
-                                      );
-                                      setState(
-                                          () => _showBackToTop = false);
-                                    },
-                                    child: const SizedBox(
-                                      width: 52,
-                                      height: 52,
-                                      child: Icon(
-                                          Icons.keyboard_arrow_up_rounded,
-                                          color: Colors.white,
-                                          size: 28),
-                                    ),
-                                  )
-                                : const SizedBox.shrink(
-                                    key: ValueKey('no_back_to_top')),
-                          ),
-                        ),
-                      ],
-                    ),
+        return PopScope(
+          canPop: !_isEditing,
+          onPopInvokedWithResult: (didPop, _) async {
+            if (!didPop && _isEditing) await _exitEditMode();
+          },
+          child: AnnotatedRegion<SystemUiOverlayStyle>(
+            value: isDark
+                ? const SystemUiOverlayStyle(
+                    statusBarColor: Colors.transparent,
+                    statusBarIconBrightness: Brightness.light,
+                  )
+                : const SystemUiOverlayStyle(
+                    statusBarColor: Colors.transparent,
+                    statusBarIconBrightness: Brightness.dark,
                   ),
+            child: Scaffold(
+              extendBody: true,
+              extendBodyBehindAppBar: true,
+              body: AnimatedGradientBg(
+                child: _loading
+                    ? _buildLoadingIndicator(theme)
+                    : FadeTransition(
+                        opacity: _fadeAnimation,
+                        child: Stack(
+                          children: [
+                            // 内容
+                            SafeArea(
+                              top: false,
+                              bottom: false,
+                              child: _isEditing
+                                  ? const SizedBox()
+                                  : _buildContent(),
+                            ),
+
+                            // 编辑模式
+                            if (_isEditing)
+                              SafeArea(
+                                bottom: false,
+                                child: Padding(
+                                  padding: EdgeInsets.fromLTRB(
+                                    16,
+                                    MediaQuery.of(context).padding.top + 72,
+                                    16,
+                                    MediaQuery.of(context).padding.bottom + 16,
+                                  ),
+                                  child: GlassCard(
+                                    borderRadius: 16,
+                                    padding: EdgeInsets.zero,
+                                    color: isDark
+                                        ? const Color(0xFF0D0D1A)
+                                            .withValues(alpha: 0.85)
+                                        : Colors.white.withValues(alpha: 0.85),
+                                    border: Border.all(
+                                      color: isDark
+                                          ? Colors.white.withValues(alpha: 0.08)
+                                          : theme.primaryColor
+                                              .withValues(alpha: 0.12),
+                                    ),
+                                    child: TextField(
+                                      controller: _editController,
+                                      maxLines: null,
+                                      expands: true,
+                                      textAlignVertical: TextAlignVertical.top,
+                                      style: GoogleFonts.jetBrainsMono(
+                                        fontSize: tp.fontSize,
+                                        color: theme.textSecondary,
+                                        height: tp.lineHeight,
+                                      ),
+                                      decoration: InputDecoration(
+                                        contentPadding:
+                                            const EdgeInsets.all(16),
+                                        border: InputBorder.none,
+                                        hintText: '在此编辑内容...',
+                                        hintStyle: GoogleFonts.inter(
+                                          color: theme.textSecondary
+                                              .withValues(alpha: 0.3),
+                                        ),
+                                      ),
+                                      cursorColor: theme.primaryColor,
+                                    ),
+                                  ),
+                                ),
+                              ),
+
+                            // 顶部栏（平滑动画）
+                            AnimatedPositioned(
+                              duration: const Duration(milliseconds: 350),
+                              curve: Curves.easeOutQuint,
+                              top: _showAppBar
+                                  ? 0
+                                  : -(MediaQuery.of(context).padding.top + 72),
+                              left: 0,
+                              right: 0,
+                              child: SafeArea(
+                                bottom: false,
+                                child: Padding(
+                                  padding:
+                                      const EdgeInsets.fromLTRB(12, 8, 12, 8),
+                                  child: GlassAppBar(
+                                    child: _isEditing
+                                        ? _buildEditAppBar()
+                                        : _isSearching
+                                            ? _buildSearchAppBar()
+                                            : _buildNormalAppBar(),
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                            // 返回顶部 FAB
+                            Positioned(
+                              bottom:
+                                  MediaQuery.of(context).padding.bottom + 24,
+                              right: 20,
+                              child: AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 400),
+                                switchInCurve: Curves.elasticOut,
+                                switchOutCurve: Curves.easeInBack,
+                                transitionBuilder: (child, anim) {
+                                  return FadeTransition(
+                                    opacity: anim,
+                                    child: ScaleTransition(
+                                      scale: Tween<double>(begin: 0.3, end: 1.0)
+                                          .animate(CurvedAnimation(
+                                        parent: anim,
+                                        curve: Curves.elasticOut,
+                                      )),
+                                      child: child,
+                                    ),
+                                  );
+                                },
+                                child: _showBackToTop && !_isEditing
+                                    ? GlassFAB(
+                                        key: const ValueKey('back_to_top'),
+                                        onTap: () {
+                                          _backToTopHideTimer?.cancel();
+                                          _scrollCtrl.animateTo(
+                                            0,
+                                            duration: const Duration(
+                                                milliseconds: 500),
+                                            curve: Curves.easeOut,
+                                          );
+                                          setState(
+                                              () => _showBackToTop = false);
+                                        },
+                                        child: const SizedBox(
+                                          width: 52,
+                                          height: 52,
+                                          child: Icon(
+                                              Icons.keyboard_arrow_up_rounded,
+                                              color: Colors.white,
+                                              size: 28),
+                                        ),
+                                      )
+                                    : const SizedBox.shrink(
+                                        key: ValueKey('no_back_to_top')),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+              ),
             ),
           ),
         );
@@ -629,15 +705,30 @@ class _ReaderPageState extends State<ReaderPage> with TickerProviderStateMixin {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
-              if (!_isMarkdown)
-                Text(
-                  getFileTypeLabel(widget.filePath),
-                  style: GoogleFonts.inter(
-                    fontSize: 10,
-                    color: theme.primaryColor,
-                    fontWeight: FontWeight.w600,
+              Row(
+                children: [
+                  Text(
+                    getFileTypeLabel(widget.filePath),
+                    style: GoogleFonts.inter(
+                      fontSize: 10,
+                      color: theme.primaryColor,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 7),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 180),
+                    child: Text(
+                      '已读 ${(_readingProgress * 100).round()}%',
+                      key: ValueKey((_readingProgress * 100).round()),
+                      style: GoogleFonts.inter(
+                        fontSize: 10,
+                        color: theme.textSecondary.withValues(alpha: 0.55),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
@@ -715,13 +806,26 @@ class _ReaderPageState extends State<ReaderPage> with TickerProviderStateMixin {
                     _saveFile();
                   },
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.save_rounded,
-                            color: Colors.white, size: 18),
+                        if (_saving)
+                          const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        else
+                          const Icon(
+                            Icons.save_rounded,
+                            color: Colors.white,
+                            size: 18,
+                          ),
                         const SizedBox(width: 6),
                         Text(
                           '保存',
@@ -777,8 +881,8 @@ class _ReaderPageState extends State<ReaderPage> with TickerProviderStateMixin {
                       color: theme.textSecondary.withValues(alpha: 0.4),
                     ),
                     border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 8),
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     isDense: true,
                   ),
                   cursorColor: theme.primaryColor,
@@ -878,17 +982,13 @@ class _ReaderPageState extends State<ReaderPage> with TickerProviderStateMixin {
         : isDark
             ? theme.textSecondary.withValues(alpha: 0.7)
             : const Color(0xFF475569);
-    final bulletColor = isAurora
-        ? const Color(0xFF6EE7B7)
-        : theme.primaryColor;
+    final bulletColor = isAurora ? const Color(0xFF6EE7B7) : theme.primaryColor;
     final h3Color = isAurora
         ? const Color(0xFF818CF8)
         : isDark
             ? theme.accentColor
             : theme.primaryColor;
-    final h4Color = isAurora
-        ? const Color(0xFF6EE7B7)
-        : theme.primaryColor;
+    final h4Color = isAurora ? const Color(0xFF6EE7B7) : theme.primaryColor;
     final tableHeadColor = isAurora
         ? const Color(0xFFE8FFF4)
         : isDark
@@ -910,12 +1010,10 @@ class _ReaderPageState extends State<ReaderPage> with TickerProviderStateMixin {
         shadows: isAurora
             ? [
                 Shadow(
-                    color:
-                        const Color(0xFF6EE7B7).withValues(alpha: 0.35),
+                    color: const Color(0xFF6EE7B7).withValues(alpha: 0.35),
                     blurRadius: 28),
                 Shadow(
-                    color:
-                        const Color(0xFF818CF8).withValues(alpha: 0.15),
+                    color: const Color(0xFF818CF8).withValues(alpha: 0.15),
                     blurRadius: 40),
               ]
             : [

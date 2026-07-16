@@ -9,8 +9,7 @@ import '../services/preferences_service.dart';
 final ValueNotifier<int> globalThemeVersion = ValueNotifier<int>(0);
 
 /// 全局主题过渡通知器 — 触发交叉淡入淡出动画
-final ValueNotifier<double> globalThemeTransition =
-    ValueNotifier<double>(1.0);
+final ValueNotifier<double> globalThemeTransition = ValueNotifier<double>(1.0);
 
 /// 主题 Provider — InheritedWidget 实现，管理全局主题状态和持久化
 class ThemeProvider extends StatefulWidget {

@@ -78,11 +78,7 @@ class _HomePageState extends State<HomePage> {
     globalIntentFileCallback = (filePath) {
       debugPrint('[HomePage] 全局回调收到文件: $filePath');
       if (mounted) {
-        _addToRecent(filePath);
-        Navigator.pushNamed(context, '/reader', arguments: {
-          'path': filePath,
-          'fileType': getFileType(filePath),
-        });
+        _openReader(filePath);
       }
     };
 
@@ -91,11 +87,7 @@ class _HomePageState extends State<HomePage> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final fp = initialFilePath!;
         initialFilePath = null;
-        _addToRecent(fp);
-        Navigator.pushNamed(context, '/reader', arguments: {
-          'path': fp,
-          'fileType': getFileType(fp),
-        });
+        _openReader(fp);
       });
     }
   }
@@ -123,25 +115,41 @@ class _HomePageState extends State<HomePage> {
     if (mounted) setState(() {});
   }
 
+  Future<void> _openReader(String filePath) async {
+    await _addToRecent(filePath);
+    if (!mounted) return;
+    await Navigator.pushNamed(context, '/reader', arguments: {
+      'path': filePath,
+      'fileType': getFileType(filePath),
+    });
+    if (mounted) setState(() {});
+  }
+
   Future<void> _pickFile() async {
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: [
-          'md', 'markdown', 'txt', 'html', 'htm',
-          'json', 'xml', 'yaml', 'yml', 'csv',
-          'log', 'cfg', 'ini', 'conf', 'text',
+          'md',
+          'markdown',
+          'txt',
+          'html',
+          'htm',
+          'json',
+          'xml',
+          'yaml',
+          'yml',
+          'csv',
+          'log',
+          'cfg',
+          'ini',
+          'conf',
+          'text',
         ],
       );
       if (result != null && result.files.single.path != null) {
         final filePath = result.files.single.path!;
-        await _addToRecent(filePath);
-        if (mounted) {
-          Navigator.pushNamed(context, '/reader', arguments: {
-            'path': filePath,
-            'fileType': getFileType(filePath),
-          });
-        }
+        await _openReader(filePath);
       }
     } catch (e) {
       debugPrint('[HomePage] 文件选择失败: $e');
@@ -165,7 +173,8 @@ class _HomePageState extends State<HomePage> {
     HapticFeedback.mediumImpact();
     _recentFiles.remove(path);
     await PreferencesService.setRecentFiles(_recentFiles);
-    setState(() {});
+    await PreferencesService.clearReadingProgress(path);
+    if (mounted) setState(() {});
   }
 
   @override
@@ -249,7 +258,8 @@ class _HomePageState extends State<HomePage> {
                               icon: Icons.cloud_outlined,
                               onTap: () {
                                 HapticFeedback.lightImpact();
-                                Navigator.pushNamed(context, '/network_storage', arguments: {'type': 'webdav'});
+                                Navigator.pushNamed(context, '/network_storage',
+                                    arguments: {'type': 'webdav'});
                               },
                               compact: true,
                             ),
@@ -302,11 +312,7 @@ class _HomePageState extends State<HomePage> {
                                     filePath: filePath,
                                     onTap: () {
                                       HapticFeedback.lightImpact();
-                                      _addToRecent(filePath);
-                                      Navigator.pushNamed(context, '/reader', arguments: {
-                                        'path': filePath,
-                                        'fileType': getFileType(filePath),
-                                      });
+                                      _openReader(filePath);
                                     },
                                     onDismiss: () => _removeRecent(filePath),
                                   ),
@@ -339,8 +345,7 @@ class _HomePageState extends State<HomePage> {
             color: ThemeProvider.of(context).currentTheme.fabBorderColor,
             width: 1),
         child: Container(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -380,7 +385,8 @@ class _FileCard extends StatefulWidget {
   State<_FileCard> createState() => _FileCardState();
 }
 
-class _FileCardState extends State<_FileCard> with SingleTickerProviderStateMixin {
+class _FileCardState extends State<_FileCard>
+    with SingleTickerProviderStateMixin {
   late AnimationController _scaleController;
   late Animation<double> _scaleAnim;
   bool? _fileExists;
@@ -429,6 +435,22 @@ class _FileCardState extends State<_FileCard> with SingleTickerProviderStateMixi
         curve: Curves.easeOutCubic);
   }
 
+  void _handleTap() {
+    if (_fileExists == false) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('文件已移动或删除'),
+          action: SnackBarAction(
+            label: '移除记录',
+            onPressed: widget.onDismiss,
+          ),
+        ),
+      );
+      return;
+    }
+    widget.onTap();
+  }
+
   @override
   Widget build(BuildContext context) {
     final tp = ThemeProvider.of(context);
@@ -437,6 +459,7 @@ class _FileCardState extends State<_FileCard> with SingleTickerProviderStateMixi
     final name = p.basename(widget.filePath);
     final fileTypeLabel = getFileTypeLabel(widget.filePath);
     final exists = _fileExists ?? true;
+    final progress = PreferencesService.getReadingProgress(widget.filePath);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -462,97 +485,143 @@ class _FileCardState extends State<_FileCard> with SingleTickerProviderStateMixi
             onTapDown: _onTapDown,
             onTapUp: _onTapUp,
             onTapCancel: _onTapCancel,
-            onTap: widget.onTap,
+            onTap: _handleTap,
             child: GlassCard(
               padding: const EdgeInsets.all(16),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: exists
-                            ? [
-                                theme.primaryColor
-                                    .withValues(alpha: 0.4),
-                                theme.accentColor.withValues(alpha: 0.2)
-                              ]
-                            : [
-                                Colors.redAccent.withValues(alpha: 0.3),
-                                Colors.red.withValues(alpha: 0.1)
-                              ],
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      exists
-                          ? Icons.description_rounded
-                          : Icons.error_outline_rounded,
-                      color: Colors.white70,
-                      size: 22,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          name,
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: exists
-                                ? theme.textColor
-                                : theme.textSecondary
-                                    .withValues(alpha: 0.4),
+                  Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: exists
+                                ? [
+                                    theme.primaryColor.withValues(alpha: 0.4),
+                                    theme.accentColor.withValues(alpha: 0.2),
+                                  ]
+                                : [
+                                    Colors.redAccent.withValues(alpha: 0.3),
+                                    Colors.red.withValues(alpha: 0.1),
+                                  ],
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        const SizedBox(height: 4),
-                        Row(
+                        child: Icon(
+                          exists
+                              ? Icons.description_rounded
+                              : Icons.error_outline_rounded,
+                          color: Colors.white70,
+                          size: 22,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: theme.primaryColor
-                                    .withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(4),
+                            Text(
+                              name,
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: exists
+                                    ? theme.textColor
+                                    : theme.textSecondary
+                                        .withValues(alpha: 0.4),
                               ),
-                              child: Text(
-                                fileTypeLabel,
-                                style: GoogleFonts.inter(
-                                  fontSize: 10,
-                                  color: theme.primaryColor,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                p.dirname(widget.filePath),
-                                style: GoogleFonts.inter(
-                                  fontSize: 11,
-                                  color: theme.textSecondary
-                                      .withValues(alpha: 0.3),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: theme.primaryColor
+                                        .withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    fileTypeLabel,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 10,
+                                      color: theme.primaryColor,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
                                 ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    p.dirname(widget.filePath),
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11,
+                                      color: theme.textSecondary
+                                          .withValues(alpha: 0.3),
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
+                      ),
+                      const SizedBox(width: 8),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        color: theme.textSecondary.withValues(alpha: 0.3),
+                        size: 20,
+                      ),
+                    ],
+                  ),
+                  if (exists && progress > 0.01) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(99),
+                            child: TweenAnimationBuilder<double>(
+                              tween: Tween<double>(end: progress),
+                              duration: const Duration(milliseconds: 420),
+                              curve: Curves.easeOutCubic,
+                              builder: (_, value, __) =>
+                                  LinearProgressIndicator(
+                                value: value,
+                                minHeight: 4,
+                                backgroundColor:
+                                    theme.primaryColor.withValues(alpha: 0.08),
+                                valueColor: AlwaysStoppedAnimation(
+                                  theme.primaryColor,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          progress >= 0.98
+                              ? '已读完'
+                              : '${(progress * 100).round()}%',
+                          style: GoogleFonts.inter(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: theme.primaryColor,
+                          ),
+                        ),
                       ],
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Icon(Icons.chevron_right_rounded,
-                      color: theme.textSecondary.withValues(alpha: 0.3),
-                      size: 20),
+                  ],
                 ],
               ),
             ),
