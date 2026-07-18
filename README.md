@@ -1,5 +1,7 @@
 # Amber MD 🦐
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 > 极简玻璃态 Markdown 阅读器
 
 一款专注于 **美学与体验** 的 Markdown 文档阅读器，采用 glassmorphism（玻璃态）设计风格，支持 5 种霓虹动画主题。
