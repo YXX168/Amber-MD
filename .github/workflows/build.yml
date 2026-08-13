@@ -49,7 +49,7 @@ jobs:
         run: flutter build apk --release --target-platform android-arm64
 
       - name: Upload APK artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: amber-md-${{ github.run_number }}-arm64-apk
           path: build/app/outputs/flutter-apk/app-release.apk
