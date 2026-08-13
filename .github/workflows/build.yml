@@ -2,43 +2,56 @@ name: Build Flutter APK
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
-  workflow_dispatch:  # 手动触发
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: amber-md-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
+    name: Analyze, test and build ARM64 APK
     runs-on: ubuntu-latest
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Setup Flutter
-      uses: subosito/flutter-action@v2
-      with:
-        flutter-version: '3.29.0'
-        channel: 'stable'
-    
-    - name: Get dependencies
-      run: flutter pub get
+      - name: Checkout source
+        uses: actions/checkout@v4
 
-    - name: Check formatting
-      run: dart format --output=none --set-exit-if-changed lib test
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.29.0'
+          channel: stable
+          cache: true
 
-    - name: Analyze
-      run: flutter analyze --no-fatal-infos
+      - name: Verify Flutter version
+        run: flutter --version
 
-    - name: Test
-      run: flutter test
-    
-    - name: Build APK (Release)
-      run: flutter build apk --release --target-platform android-arm64
-    
-    - name: Upload APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: Amber-MD-${{ github.run_number }}-arm64
-        path: build/app/outputs/flutter-apk/app-release.apk
-        retention-days: 30
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Check formatting
+        run: dart format --output=none --set-exit-if-changed lib test
+
+      - name: Analyze source
+        run: flutter analyze --no-fatal-infos
+
+      - name: Run tests
+        run: flutter test --reporter expanded
+
+      - name: Build ARM64 APK
+        run: flutter build apk --release --target-platform android-arm64
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: amber-md-${{ github.run_number }}-arm64-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 30

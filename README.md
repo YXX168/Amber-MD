@@ -1,6 +1,8 @@
 # Amber MD 🦐
 
+[![Build](https://github.com/YXX168/Amber-MD/actions/workflows/build.yml/badge.svg)](https://github.com/YXX168/Amber-MD/actions/workflows/build.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Flutter](https://img.shields.io/badge/Flutter-3.29.0-02569B?logo=flutter)](https://flutter.dev/)
 
 > 极简玻璃态 Markdown 阅读器
 
@@ -30,9 +32,11 @@
 
 ## 📥 下载安装
 
-从 [Releases](https://github.com/YXX168/Amber-MD/releases) 下载最新 APK，直接安装即可。
+从 [Releases](https://github.com/YXX168/Amber-MD/releases) 下载正式发布的 APK，直接安装即可。
 
-**支持系统**: Android 5.0+
+> 当前源码版本为 `6.3.0+630`；Release 页面只代表已经正式发布并提供安装包的版本。
+
+**支持系统**：Android 5.0+
 
 ---
 
@@ -88,17 +92,13 @@ WebDAV 体验增强：
 
 ---
 
-## 📜 版本历史
+## 📜 版本与变更
 
-- **v6.3.0** — 阅读进度与断点续读、未保存修改保护、WebDAV 证书安全开关、最近文档进度条、CI 质量检查
-- **v6.2.0 / v6.1.4 APK 更新** — WebDAV 测试连接、最近连接、上次目录记忆、下载浮层修复、提示驻留 0.5 秒、主题切换路由稳定性修复
-- **v6.1.4** — 空文档缩放+光晕同步、WebDAV下载提示美化
-- **v6.1.3** — 预加载动画、WebDAV逐项入场动画
-- **v6.1.2** — 骨架屏加载、动画增强、交互优化
-- **v6.1.0** — UI优化、WebDAV面包屑导航
-- **v6.0.2** — WebDAV重定向修复（稳定版）
+- 当前源码版本：`6.3.0+630`
+- 正式安装包：以 [GitHub Releases](https://github.com/YXX168/Amber-MD/releases) 为准
+- 详细变更记录：[CHANGELOG.md](CHANGELOG.md)
 
-详见 [CHANGELOG](https://github.com/YXX168/Amber-MD/releases)
+源码版本、Git tag 和正式 Release 分开管理；只有 Release 页面中的版本视为已正式发布。
 
 ---
 
